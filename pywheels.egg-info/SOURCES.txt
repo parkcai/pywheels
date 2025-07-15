@@ -1,6 +1,7 @@
 README.md
 setup.py
 pywheels/__init__.py
+pywheels/i18n.py
 pywheels.egg-info/PKG-INFO
 pywheels.egg-info/SOURCES.txt
 pywheels.egg-info/dependency_links.txt

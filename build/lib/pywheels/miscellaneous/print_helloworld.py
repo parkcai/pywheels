@@ -1,3 +1,6 @@
+from gettext import gettext as translate
+
+
 __all__ = [
     "print_helloworld",
 ]
@@ -6,4 +9,4 @@ __all__ = [
 def print_helloworld(
 )-> None:
     
-    print("Hello, World!")
+    print(translate("Hello, World!"))
