@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: pywheels
-Version: 0.1.0
-Summary: light-weight python wheels for parkcai
+Version: 0.1.1
+Summary: improve print_helloworld
 Home-page: https://github.com/parkcai/pywheels
 Author: parkcai
 Author-email: sun_retailer@163.com

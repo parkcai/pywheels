@@ -18,10 +18,10 @@ pip install pywheels
 
 ### 构建包
 
-在项目根目录下运行以下命令以生成分发文件：
+确保修改 `setup.py` 中的版本号后，在项目根目录下运行：
 
 ```bash
-python setup.py sdist bdist_wheel
+rm -rf build/ dist/ *.egg-info && python setup.py sdist bdist_wheel
 ```
 
 ### 登录 PyPI
@@ -34,19 +34,15 @@ python setup.py sdist bdist_wheel
 pip install twine
 ```
 
-建议使用 API token 登录，更安全：
-
-```bash
-twine upload dist/*
-```
-
-首次执行 `upload` 时将提示输入用户名和密码。推荐在 `~/.pypirc` 中配置：
+建议使用 API token 登录，更安全。推荐在 `~/.pypirc` 中配置：
 
 ```ini
 [pypi]
 username = __token__
 password = pypi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+首次上传时会提示输入用户名和密码，配置后可免交互。
 
 ### 上传分发包
 
@@ -55,3 +51,11 @@ password = pypi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```bash
 twine upload dist/*
 ```
+
+---
+
+### 注意事项
+
+- PyPI 不允许覆盖已发布的同版本文件，上传前务必更新版本号。
+- 上传失败可清理 `dist/`、`build/`、`*.egg-info` 目录后重新构建。
+- 使用 API token 代替密码，安全且方便自动化。
