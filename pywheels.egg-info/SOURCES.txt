@@ -1,0 +1,8 @@
+README.md
+setup.py
+pywheels/__init__.py
+pywheels/miscellaneous.py
+pywheels.egg-info/PKG-INFO
+pywheels.egg-info/SOURCES.txt
+pywheels.egg-info/dependency_links.txt
+pywheels.egg-info/top_level.txt

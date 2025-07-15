@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: pywheels
+Version: 0.1.0
+Summary: light-weight python wheels for parkcai
+Home-page: https://github.com/parkcai/pywheels
+Author: parkcai
+Author-email: sun_retailer@163.com
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: summary
