@@ -1,6 +1,6 @@
 # pywheels
 
-Light-weight Python wheels for parkcai.
+Light-weight Python wheels.
 
 ## 安装
 
@@ -36,7 +36,7 @@ def print_helloworld(
     print(translate("Hello, World!"))
 ```
 
-- `translate()` 默认会根据环境变量（如 `LANG`, `LC_ALL`）自动选择语言。也可通过调用 `set_language('zh_CN')` 来手动切换语言。
+- `translate()` 默认会根据环境变量（如 `LANG`, `LC_ALL`）自动选择语言。也可通过调用 `set_language('zh')` 来手动切换语言。
 
 ### 生成国际化目标文件（.mo）的基本步骤
 
