@@ -11,8 +11,20 @@ __all__ = [
     "init_language",
 ]
 
-        
-translate: Callable[[str], str] = gettext.gettext
+
+class DynamicTranslate:
+    
+    def __init__(self):
+        self._func: Callable[[str], str] = gettext.gettext
+
+    def __call__(self, msg: str) -> str:
+        return self._func(msg)
+
+    def bind(self, func: Callable[[str], str]):
+        self._func = func
+
+
+translate = DynamicTranslate()
 
 
 def set_language(
@@ -23,6 +35,10 @@ def set_language(
     
     domain = "messages"
     localedir = str(Path(__file__).resolve().parent / "locales")
+    
+    if language == "en": language = "en_US"
+    if language == "zh": language = "zh_CN"
+    if language == "zh_TW": raise ValueError("zh_TW is not supported. Use zh or zh_CN instead.")
 
     t = gettext.translation(
         domain = domain,
@@ -31,7 +47,7 @@ def set_language(
         fallback = True,
     )
     
-    translate =  t.gettext
+    translate.bind(t.gettext)
 
 
 def init_language(
@@ -47,7 +63,7 @@ def init_language(
         language, _ = locale.getdefaultlocale()
         
     if not language:
-        language = "en_US"
+        language = "en"
         
     language = language.split('.')[0]
     
