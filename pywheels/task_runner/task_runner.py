@@ -123,32 +123,26 @@ def execute_python_script(
     """
        
     temp_file_path = get_temp_file_path(
-        suffix=".py"
+        suffix=".py",
+        prefix = "tmp_TempPythonScript_DeleteMe_",
+        directory = None,
     )
         
-    try:
-        with open(temp_file_path, "w", encoding="utf-8") as temp_file:
-            temp_file.write(script_content)
+    with open(
+        file = temp_file_path, 
+        mode = "w", 
+        encoding = "UTF-8",
+    ) as temp_file:
+        temp_file.write(script_content)
         
-        result_info = execute_command(
-            command = f"{python_command} {temp_file_path}",
-            timeout_seconds = timeout_seconds,
-            shell = False,
-        )
-    
-    except Exception as e:
-        result_info = {
-            "success": False,
-            "stdout": "",
-            "stderr": "",
-            "timeout": False,
-            "exit_code": None,
-            "exception": translate("Failed to execute script: %s") % (e),
-        }
-    
-    finally:
-        delete_file(
-            file_path = temp_file_path
-        )
+    result_info = execute_command(
+        command = f"{python_command} {temp_file_path}",
+        timeout_seconds = timeout_seconds,
+        shell = False,
+    )
+
+    delete_file(
+        file_path = temp_file_path
+    )
     
     return result_info
