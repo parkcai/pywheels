@@ -12,9 +12,21 @@ pip install pywheels
 
 ## 功能
 
+### file_tools
+
+- guarantee_file_exist
+- get_tmp_file_path
+- delete_file
+- copy_file
+
 ### llm_tools
 
 - get_answer：方便调大语言模型 API 的一个 wrapper 函数
+
+### task_runner
+
+- execute_command
+- execute_python_script
 
 ## 贡献
 
