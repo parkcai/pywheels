@@ -16,24 +16,27 @@ pip install pywheels
 
 ## 国际化
 
-### 国际化初始化
+### 基本情况
 
 - 使用标准库 `gettext` 实现多语言支持。
-- 每个需要国际化的模块应在顶部显式导入：
+- 项目在 `pywheels/i18n.py` 中定义了三个接口：
+
+  - `translate`: 翻译函数，模块内可用 `from pywheels.i18n import translate` 导入（推荐使用相对路径）；
+  - `set_language(language)`: 手动切换语言；
+  - `init_language()`: 从系统环境变量自动初始化语言（已在模块加载时默认执行）。
+
+- 示例用法：
 
 ```python
-from gettext import gettext as translate
+# pywheels/miscellaneous/hello.py
+from ..i18n import translate
+
+def print_helloworld(
+)-> None:
+    print(translate("Hello, World!"))
 ```
 
-- 统一调用 `setup_translate_language()` 初始化语言环境，该函数在 `pywheels/i18n.py` 中定义并在`pywheels/__init__.py`中调用一次：
-
-```python
-# pywheels/__init__.py
-from .i18n import setup_translate_language
-setup_translate_language()
-```
-
-- `setup_translate_language()` 具备良好的跨平台兼容性，自动从系统环境变量中检测语言并加载翻译（见 `pywheels/i18n.py` 模块）。
+- `translate()` 默认会根据环境变量（如 `LANG`, `LC_ALL`）自动选择语言。也可通过调用 `set_language('zh_CN')` 来手动切换语言。
 
 ### 生成国际化目标文件（.mo）的基本步骤
 
@@ -52,7 +55,7 @@ for lang in zh_CN en_US; do
 done
 ```
 
-特别注意，参数`--keyword=translate`告诉了 xgettext 识别 `translate`。
+> 💡 参数 `--keyword=translate` 告诉 `xgettext` 将 `translate("...")` 作为翻译目标。
 
 2. **翻译 `.po` 文件中的内容**
 
@@ -73,13 +76,13 @@ done
 
 ### 注意事项
 
-- 所有待翻译内容需用 `translate("...")` 包裹，确保能被提取。
+- 所有待翻译内容需用 `translate("...")` 包裹，确保能被 `xgettext` 提取。
 - `.po` 和 `.mo` 文件需为 UTF-8 编码。
-- 项目只初始化一次语言环境，其它模块无需重复加载。
-- 推荐使用 C 风格占位符（如 `%s`, `%d`）以便 `.po` 文件翻译更自然：
+- 国际化模块仅初始化一次语言环境，其它模块通过导入 `translate` 使用即可。
+- 推荐使用 C 风格占位符（如 `%s`, `%d`），以便 `.po` 文件中的翻译更自然、格式更稳定：
 
 ```python
-translate("Hello, %s!") % name
+translate("Hello, %s!") % (name)
 ```
 
 ## 发布至 PyPI
@@ -119,8 +122,6 @@ password = pypi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```bash
 twine upload dist/*
 ```
-
----
 
 ### 注意事项
 

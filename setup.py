@@ -4,10 +4,14 @@ from setuptools import find_packages
 
 setup(
     name = 'pywheels',
-    version = '0.1.2.1',
+    version = '0.2.0',
     packages = find_packages(),
-    description = 'add i18n support for pywheels',
+    description = 'finish naive wheels with i18n support',
     author = 'parkcai',
     author_email = 'sun_retailer@163.com',
     url = 'https://github.com/parkcai/pywheels',
+    include_package_data = True,
+    package_data = {
+        'pywheels': ['locales/**/LC_MESSAGES/*.mo'],
+    },
 )
