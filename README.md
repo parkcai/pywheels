@@ -10,6 +10,12 @@ Light-weight Python wheels.
 pip install pywheels
 ```
 
+## 功能
+
+### llm_tools
+
+- get_answer：方便调大语言模型 API 的一个 wrapper 函数
+
 ## 贡献
 
 欢迎贡献您的代码或建议！请在 GitHub 提交问题或拉取请求。
@@ -40,7 +46,7 @@ def print_helloworld(
 
 ### 生成国际化目标文件（.mo）的基本步骤
 
-1. **提取所有 `.py` 文件中的翻译字符串，为目标语言准备 `.po` 文件（如尚未存在）并明确编码方式为 UTF-8**：
+1. **提取`pywheels`中所有 `.py` 文件中的翻译字符串，为目标语言准备 `.po` 文件（如尚未存在）并明确编码方式为 UTF-8**：
 
 ```bash
 xgettext -L Python --keyword=translate -o pywheels/locales/messages.pot $(find . -name "*.py")

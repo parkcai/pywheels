@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-07-16 03:24+0000\n"
+"POT-Creation-Date: 2025-07-16 13:19+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,12 +17,89 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: build/lib/pywheels/miscellaneous/print_helloworld.py:12
+#: build/lib/pywheels/miscellaneous/hello.py:13
 #: pywheels/miscellaneous/hello.py:13
 msgid "Hello, World!"
 msgstr "你好，世界！"
 
+#: build/lib/pywheels/miscellaneous/hello.py:20
 #: pywheels/miscellaneous/hello.py:20
 #, python-format
 msgid "Hello, %s!"
 msgstr "你好，%s！"
+
+#: pywheels/file_tools/basic.py:63
+#, python-format
+msgid "程序出错，文件 %s 不存在！"
+msgstr "程序出错，文件 %s 不存在！"
+
+#: pywheels/file_tools/basic.py:161
+#, python-format
+msgid "删除失败: %s, 错误: %s"
+msgstr "删除失败：%s，错误：%s"
+
+#: pywheels/file_tools/basic.py:188
+#, python-format
+msgid "源路径不存在: %s"
+msgstr "源路径不存在：%s"
+
+#: pywheels/file_tools/basic.py:217
+#, python-format
+msgid "不支持的源路径类型: %s"
+msgstr "不支持的源路径类型：%s"
+
+#: pywheels/file_tools/mat.py:29
+#, python-format
+msgid "无效的路径: %s，请检查该路径下是否存在一个 `.mat` 文件"
+msgstr "无效的路径：%s，请检查该路径下是否存在一个 `.mat` 文件"
+
+#: pywheels/file_tools/mat.py:88 pywheels/file_tools/mat.py:96
+#, python-format
+msgid "Error: mat_path %s invalid, or the file doesn't contain attribute %s."
+msgstr "错误：mat_path %s 无效，或者文件不包含属性 %s。"
+
+#: pywheels/file_tools/table.py:39
+#, python-format
+msgid "未找到表格文件 %s"
+msgstr "未找到表格文件 %s"
+
+#: pywheels/file_tools/table.py:71
+#, python-format
+msgid "读取表格时发生错误: %s"
+msgstr "读取表格时发生错误：%s"
+
+#: pywheels/file_tools/table.py:186
+#, python-format
+msgid "行名 '%s' 未在第一列中找到"
+msgstr "行名“%s”未在第一列中找到"
+
+#: pywheels/file_tools/table.py:191
+#, python-format
+msgid "列名 '%s' 未在表格中找到"
+msgstr "列名“%s”未在表格中找到"
+
+#: pywheels/task_runner/task_runner.py:71
+#, python-format
+msgid "TimeoutExpired: %s"
+msgstr "执行超时：%s"
+
+#: pywheels/task_runner/task_runner.py:74
+#, python-format
+msgid "%s: %s"
+msgstr "%s：%s"
+
+#: pywheels/task_runner/task_runner.py:130
+#, python-format
+msgid "Failed to execute script: %s"
+msgstr "脚本执行失败：%s"
+
+#: pywheels/llm_tools/get_answer.py:89
+#, python-format
+msgid " api keys 文件 %s 不存在或不是一个文件！"
+msgstr "API 密钥文件 %s 不存在或不是一个有效的文件！"
+
+#: pywheels/llm_tools/get_answer.py:131
+#, python-format
+msgid "模型 %s 未被记录！"
+msgstr "模型 %s 未被登记！"
+
