@@ -33,12 +33,14 @@ def guarantee_file_exist(
         os.makedirs(file_path, exist_ok=True)
         
     else:
+        
         parent = os.path.dirname(file_path)
         
         if parent:
             os.makedirs(parent, exist_ok=True)
             
         if not os.path.exists(file_path):
+            
             with open(
                 file = file_path, 
                 mode = 'w', 
@@ -59,6 +61,7 @@ def assert_file_exist(
     if not os.path.exists(file_path):
         
         if error_message is None:
+            
             assert False, translate(
                 "程序出错，文件 %s 不存在！" % (file_path) 
             )
@@ -79,7 +82,6 @@ def append_to_file(
         mode = "a", 
         encoding = encoding
     ) as file:
-        
         file.write(content + end)
         
         
@@ -110,18 +112,24 @@ def get_temp_file_path(
     global tempfile_lock
     
     with tempfile_lock:
+        
         if suffix is None:
+            
             tmp_dir_path = tempfile.mkdtemp(
                 prefix = prefix,
                 dir = directory,
             )
+            
             return tmp_dir_path
+        
         else:
+            
             temp_file_path = tempfile.mktemp(
                 suffix = suffix,
                 prefix = prefix,
                 dir = directory,
             )
+            
             return temp_file_path
         
         
@@ -213,6 +221,7 @@ def copy_file(
                     shutil.copy2(s_item, d_item)
                     
     else:
+        
         raise ValueError(
             translate("不支持的源路径类型: %s") % (source_file_path)
         )

@@ -1,3 +1,4 @@
+import sys
 import shlex
 import subprocess
 from ..file_tools import get_temp_file_path
@@ -39,6 +40,17 @@ def execute_command(
             - exit_code (int): Subprocess exit code
             - exception (Optional[str]): Exception type and message if occurred, otherwise None
     """
+    
+    def transportable_command_parse(command):
+        
+        if not command:
+            return command
+        
+        if sys.platform == 'win32':
+            return command.split()
+        
+        else:
+            return shlex.split(command)
 
     result_info = {
         "success": False,
@@ -50,7 +62,11 @@ def execute_command(
     }
 
     try:
-        args = command if shell else shlex.split(command)
+        if isinstance(command, (list, tuple)):
+            args = command
+            
+        else:
+            args = command if shell else transportable_command_parse(command)
 
         process = subprocess.run(
             args,
