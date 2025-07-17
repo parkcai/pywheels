@@ -236,7 +236,7 @@ def clear_file(
     """
     清空指定文件的全部内容。
     
-    若文件不存在，则静默跳过。
+    若文件不存在，则调用 guarantee_file_exist 创建空白文件。
 
     参数:
         file_path (str): 目标文件的路径。
@@ -253,4 +253,4 @@ def clear_file(
             pass
         
     except FileNotFoundError:
-        pass
+        guarantee_file_exist(file_path)
