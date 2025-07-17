@@ -4,6 +4,7 @@ from .basic import append_to_file
 from .basic import get_temp_file_path
 from .basic import delete_file
 from .basic import copy_file
+from .basic import clear_file
 from .mat import check_mat_part
 from .mat import load_mat_part
 from .mat import merge_mat_files
@@ -22,6 +23,7 @@ __all__ = [
     "get_temp_file_path",
     "delete_file",
     "copy_file",
+    "clear_file",
     "read_table_item", 
     "print_table",
     "merge_mat_files",

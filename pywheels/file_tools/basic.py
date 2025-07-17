@@ -225,3 +225,31 @@ def copy_file(
         raise ValueError(
             translate("不支持的源路径类型: %s") % (source_file_path)
         )
+        
+        
+def clear_file(
+    file_path: str,
+    encoding: str = "UTF-16",
+):
+    
+    """
+    清空指定文件的全部内容。
+    
+    若文件不存在，则静默跳过。
+
+    参数:
+        file_path (str): 目标文件的路径。
+        encoding (str): 编码方式，默认为 UTF-16。
+    """
+    
+    try:
+        
+        with open(
+            file = file_path, 
+            mode = "w", 
+            encoding = encoding,
+        ):
+            pass
+        
+    except FileNotFoundError:
+        pass
