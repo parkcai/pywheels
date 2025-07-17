@@ -13,6 +13,7 @@ __all__ = [
     "get_temp_file_path",
     "delete_file",
     "copy_file",
+    "clear_file",
 ]
 
 
