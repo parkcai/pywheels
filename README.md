@@ -141,6 +141,12 @@ password = pypi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 twine upload dist/*
 ```
 
+Windows 系统下，可以：
+
+```PowerShell
+twine upload --config-file "$env:APPDATA\pypi\pypi.ini" dist/*
+```
+
 ### 注意事项
 
 - 使用 API token 代替密码，安全且方便自动化。
