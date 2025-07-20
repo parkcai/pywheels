@@ -36,6 +36,13 @@ class Ansatz:
         
     # ----------------------------- 外部动作 -----------------------------   
         
+    def get_param_num(
+        self,
+    )-> int:
+        
+        return self._param_num
+    
+    
     def reduce_to_numeric_ansatz(
         self,
         params: List[float],
