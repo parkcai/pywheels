@@ -5,6 +5,7 @@ import random
 from typing import List
 from typing import Tuple
 from typing import Callable
+from threading import Lock
 from scipy.optimize import minimize
 from ..i18n import translate
 
@@ -93,6 +94,8 @@ class Ansatz:
         self,
     )-> None:
         
+        global _check_ansatz_format_error_info
+        
         ansatz_param_num = _check_ansatz_format(
             expression = self._expression,
             variables = self._variables,
@@ -102,7 +105,7 @@ class Ansatz:
         if not ansatz_param_num:
             
             raise RuntimeError(
-                translate("拟设格式有误！")
+                translate("拟设格式有误：%s") % (_check_ansatz_format_error_info)
             )
             
         self._param_num = ansatz_param_num
@@ -221,6 +224,10 @@ class Ansatz:
         return best_params, best_output
     
     
+_check_ansatz_format_error_info_lock = Lock() 
+
+_check_ansatz_format_error_info = ""
+    
 def _check_ansatz_format(
     expression: str,
     variables: List[str],
@@ -248,6 +255,8 @@ def _check_ansatz_format(
     注意：
         本函数会首先对 `variables` 和 `functions` 中的内容进行合法性校验，若包含非法名称（如带模块前缀的函数名），将抛出异常。
     """
+    
+    global _check_ansatz_format_error_info
     
     identifier_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -339,7 +348,11 @@ def _check_ansatz_format(
     try:
         visit(tree.body)
         
-    except Exception:
+    except Exception as error:
+        
+        with _check_ansatz_format_error_info_lock:
+            _check_ansatz_format_error_info = error
+            
         return 0
 
     if param_indices:
@@ -347,9 +360,21 @@ def _check_ansatz_format(
         max_index = max(param_indices)
         
         if sorted(param_indices) != list(range(1, max_index + 1)):
+            
+            with _check_ansatz_format_error_info_lock:
+                _check_ansatz_format_error_info = translate(
+                    msg = "参数编号跳号！",
+                )
+                
             return 0
         
         return max_index
     
     else:
+        
+        with _check_ansatz_format_error_info_lock:
+            _check_ansatz_format_error_info = translate(
+                msg = "表达式中未含参数！",
+            )
+            
         return 0
