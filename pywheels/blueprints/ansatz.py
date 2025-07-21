@@ -272,6 +272,8 @@ def _check_ansatz_format(
                         "非法标识符名：'%s'，应仅由字母、数字、下划线组成，"
                         "不能包含点号等其它字符，且应以字母或下划线开头"
                     ) % (name)
+                    
+            return 0
 
     if re.search(r"[^\w\s+\-*/(),]", expression):
         
@@ -383,7 +385,7 @@ def _check_ansatz_format(
             
             with _check_ansatz_format_error_info_lock:
                 _check_ansatz_format_error_info = translate(
-                    msg = "参数编号跳号！",
+                    "参数编号跳号！"
                 )
                 
             return 0
