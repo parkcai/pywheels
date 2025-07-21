@@ -253,7 +253,8 @@ def _check_ansatz_format(
             - 如果表达式不合法，返回 0。
 
     注意：
-        本函数会首先对 `variables` 和 `functions` 中的内容进行合法性校验，若包含非法名称（如带模块前缀的函数名），将抛出异常。
+        本函数会首先对 `variables` 和 `functions` 中的内容进行合法性校验，若包含非法名称（如带模块前缀的函数名），
+        将设置错误信息并返回0。
     """
     
     global _check_ansatz_format_error_info
@@ -264,18 +265,37 @@ def _check_ansatz_format(
         
         if not identifier_pattern.fullmatch(name):
             
-            raise ValueError(
-                translate("非法标识符名：'%s'，应仅由字母、数字、下划线组成，不能包含点号等")
-                % (name)
-            )
+            with _check_ansatz_format_error_info_lock:
+                
+                _check_ansatz_format_error_info = \
+                    translate(
+                        "非法标识符名：'%s'，应仅由字母、数字、下划线组成，"
+                        "不能包含点号等其它字符，且应以字母或下划线开头"
+                    ) % (name)
 
     if re.search(r"[^\w\s+\-*/(),]", expression):
+        
+        with _check_ansatz_format_error_info_lock:
+                
+            _check_ansatz_format_error_info = \
+                translate(
+                    "表达式中含有非法字符"
+                )
+        
         return 0
 
     try:
         tree = ast.parse(expression, mode="eval")
         
     except Exception:
+        
+        with _check_ansatz_format_error_info_lock:
+                
+            _check_ansatz_format_error_info = \
+                translate(
+                    "表达式未成功解析"
+                )
+
         return 0
 
     used_names = set()
