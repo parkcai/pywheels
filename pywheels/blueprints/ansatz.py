@@ -12,7 +12,43 @@ from ..i18n import translate
 
 __all__ = [
     "Ansatz",
+    "ansatz_docstring",
 ]
+
+
+ansatz_docstring = (
+    "通过提供 expression、variables 和 functions，可以初始化一个 Ansatz 实例，用于表达一类待优化的数学结构。\n"
+    "参数说明如下：\n"
+    "- expression：一个字符串形式的数学表达式，表示一个带参函数。\n"
+    "- variables：允许在 expression 中出现的变量名列表，每个变量名必须以字母或下划线开头，且仅包含字母、数字或下划线。\n"
+    "- functions：允许调用的函数名列表，函数名必须是裸名称（例如 'sin' 而非 'math.sin'），并满足合法标识符规则。\n\n"
+
+    "expression 中可以包含：\n"
+    "- 上述 variables 中的变量；\n"
+    "- 上述 functions 中的函数调用；\n"
+    "- 参数 param1, param2, ..., paramN（编号必须从1开始，连续编号，不允许跳号）；\n"
+    "- 支持的运算符，包括：+、-、*、/、**（即加减乘除和乘方）；\n"
+    "- 括号，用于表达优先级。\n\n"
+
+    "禁止事项：\n"
+    "- 不允许在表达式中使用未在 variables 或 functions 中声明的标识符；\n"
+    "- 不允许使用任何形式的数字常量，例如 '0.5'、'2' 等；\n"
+    "- 不允许使用不支持的语法结构，如列表、字典、条件表达式等；\n"
+    "- 不允许使用不支持的函数调用形式，例如带模块前缀的函数。\n\n"
+
+    "合法示例：\n"
+    "若 variables = ['x', 'y'] 且 functions = ['sin', 'exp']，那么以下表达式是合法的：\n"
+    "- 'param1 * sin(param2 * x)'\n"
+    "- '(param1 * exp(param2 * x) + param3 * y) * param4'\n\n"
+
+    "非法示例包括：\n"
+    "- 使用未声明变量，如 'z + param1'\n"
+    "- 使用未注册函数，如 'cos(param1 * x)' 若 'cos' 不在 functions 中\n"
+    "- 包含常数，如 '(x + param1) * 0.5'\n"
+    "- 参数编号不连续，如 'param1 + param3'\n\n"
+
+    "通过合法的 ansatz 表达式，可以自动将参数替换为具体数值，用于函数评估或数值最优化等任务。"
+)
 
 
 class Ansatz:
