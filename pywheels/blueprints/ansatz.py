@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import ast
 import astor
@@ -63,13 +64,15 @@ class Ansatz:
         seed: int  = 42,
     )-> None:
         
-        self._expression = expression
-        self._variables = variables
-        self._functions = functions
-
         self._random_generator = random.Random(seed)
         
-        self._check_format()
+        self._set_value(
+            expression = expression,
+            variables = variables,
+            functions = functions,
+        )
+        
+        self._standardize_order()
         
     # ----------------------------- 外部动作 -----------------------------   
         
@@ -78,6 +81,13 @@ class Ansatz:
     )-> int:
         
         return self._param_num
+    
+    
+    def to_expression(
+        self,
+    )-> str:
+        
+        return self._to_expression()
     
     
     def reduce_to_numeric_ansatz(
@@ -123,8 +133,60 @@ class Ansatz:
                     "请使用 `random` 或 `optimize`！"
                 ) % (mode)
             )
+            
+    # ----------------------------- 重载运算符 ----------------------------- 
     
+    def __add__(
+        self, 
+        other: Ansatz,
+    )-> Ansatz:
+        
+        if not isinstance(other, Ansatz):
+            
+            raise NotImplementedError(
+                translate(
+                    "无法将 Ansatz 与 %s 类型的对象相加！"
+                ) % (other.__class__.__name__)
+            )
+            
+        if self._variables != other._variables:
+            
+            raise RuntimeError(
+                translate("两个 Ansatz 变量列表相同方可相加！")
+            )   
+            
+        self._linear_enhance()
+        other._linear_enhance()
+        
+        left_expression = self._to_expression()
+        right_expression = other._to_expression()
+        
+        right_expression = _get_standard_order_expression(
+            expression = right_expression,
+            start_no = self._param_num + 1,
+        )
+
+        return Ansatz(
+            expression = f"{left_expression} + {right_expression}",
+            variables = self._variables,
+            functions = list(set(self._functions) | set(other._functions)),
+        )
+
     # ----------------------------- 内部动作 ----------------------------- 
+    
+    def _set_value(
+        self,
+        expression: str,
+        variables: List[str],
+        functions: List[str],
+    )-> None:
+    
+        self._expression = expression
+        self._variables = variables
+        self._functions = functions
+
+        self._check_format()
+    
     
     def _check_format(
         self,
@@ -147,6 +209,29 @@ class Ansatz:
         self._param_num = ansatz_param_num
         
         
+    def _standardize_order(
+        self,
+    )-> None:
+        
+        standard_expression = _get_standard_order_expression(
+            expression = self._expression,
+            start_no = 1,
+        )
+        
+        self._set_value(
+            expression = standard_expression,
+            variables = self._variables,
+            functions = self._functions,
+        )
+        
+        
+    def _to_expression(
+        self,
+    )-> str:
+        
+        return self._expression
+        
+        
     def _reduce_to_numeric_ansatz(
         self,
         params: List[float],
@@ -162,7 +247,10 @@ class Ansatz:
             f"param{i + 1}": value for i, value in enumerate(params)
         }
 
-        tree = ast.parse(self._expression, mode='eval')
+        tree = ast.parse(
+            source = self._expression, 
+            mode = "eval",
+        )
 
         class ParamReplacer(ast.NodeTransformer):
             def visit_Name(self, node):
@@ -260,6 +348,53 @@ class Ansatz:
         return best_params, best_output
     
     
+    def _linear_enhance(
+        self,
+    )-> None:
+        
+        def add_level_flatten(node):
+            
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+                return add_level_flatten(node.left) + add_level_flatten(node.right)
+            
+            else:
+                return [node]
+        
+        tree = ast.parse(
+            source = self._expression, 
+            mode = "eval",
+        )
+        
+        add_level_terms = add_level_flatten(tree.body)
+        
+        new_add_level_terms = []
+        additional_param_no = self._param_num + 1
+        
+        for node in add_level_terms:
+            
+            source = astor.to_source(node).strip()
+            
+            new_add_level_terms.append(
+                f"param{additional_param_no} * ({source})"
+            )
+            
+            additional_param_no += 1
+            
+        linear_enhanced_expression = ""
+        
+        for index, enhanced_term in enumerate(new_add_level_terms):
+            
+            if index: linear_enhanced_expression += " + "
+            
+            linear_enhanced_expression += enhanced_term
+    
+        self._set_value(
+            expression = linear_enhanced_expression,
+            variables = self._variables,
+            functions = self._functions,
+        )
+
+
 _check_ansatz_format_error_info_lock = Lock() 
 
 _check_ansatz_format_error_info = ""
@@ -323,7 +458,10 @@ def _check_ansatz_format(
         return 0
 
     try:
-        tree = ast.parse(expression, mode="eval")
+        tree = ast.parse(
+            source = expression, 
+            mode = "eval",
+        )
         
     except Exception:
         
@@ -436,3 +574,29 @@ def _check_ansatz_format(
             )
             
         return 0
+    
+    
+def _get_standard_order_expression(
+    expression: str,
+    start_no: int,
+)-> str:
+    
+    pattern = re.compile(r'\bparam(\d+)\b')
+        
+    param_map = {}
+    current_no = start_no - 1
+
+    def replace(match):
+        
+        nonlocal current_no
+        
+        old_index = int(match.group(1))
+        
+        if old_index not in param_map:
+            current_no += 1
+            param_map[old_index] = current_no
+            
+        return f"param{param_map[old_index]}"
+    
+    return pattern.sub(replace, expression)
+
