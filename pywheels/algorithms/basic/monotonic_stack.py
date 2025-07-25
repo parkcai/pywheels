@@ -6,8 +6,8 @@ from typing import Sequence
 from typing import Callable
 from typing import Protocol
 from typing import runtime_checkable
-from ..type_tools.basic import is_same_type
-from ..i18n import translate
+from ...type_tools.basic import is_same_type
+from ...i18n import translate
 
 
 __all__ = [
