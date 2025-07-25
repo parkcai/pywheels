@@ -7,6 +7,7 @@ from typing import Callable
 from typing import Protocol
 from typing import runtime_checkable
 from ...type_tools.basic import is_same_type
+from ...type_tools.basic import is_hashable
 from ...i18n import translate
 
 
@@ -45,17 +46,33 @@ def _next_qualified_element(
     )
     
     key_dict = {}
+    hashable = is_hashable(data[0])
     
+    def get_key(datum):
+        
+        if hashable:
+            
+            if datum not in key_dict:
+                key_dict[datum] = key(datum)
+            
+            return key_dict[datum]
+        
+        else:
+            
+            datum_id = id(datum)
+            
+            if datum_id not in key_dict:
+                key_dict[datum_id] = key(datum)
+            
+            return key_dict[datum_id]
+        
     def is_qualified_for(
         datum1: DatumType, 
         datum2: DatumType,
     )-> bool:
         
-        if datum1 not in key_dict: key_dict[datum1] = key(datum1)
-        if datum2 not in key_dict: key_dict[datum2] = key(datum2)
-        
-        datum1_key = key_dict[datum1]
-        datum2_key = key_dict[datum2]
+        datum1_key = get_key(datum1)
+        datum2_key = get_key(datum2)
         
         return (qualified_means_greater and datum2_key > datum1_key) \
             or (not qualified_means_greater and datum2_key < datum1_key) \
@@ -66,13 +83,13 @@ def _next_qualified_element(
     
     data_length = len(data)
     
-    for i in range(data_length):
+    if right_direction:
+        indices = range(data_length)
         
-        if right_direction:
-            index = i
-            
-        else:
-            index = data_length - 1 - i
+    else:
+        indices = range(data_length - 1, -1, -1)
+
+    for index in indices:
             
         while monotonic_stack \
             and is_qualified_for(data[monotonic_stack[-1]], data[index]):
@@ -130,14 +147,14 @@ def _next_qualified_element_entrance_check(
         )
         
     first_datum_key = key(first_datum)
-       
+    
     try:
         
         operator.gt(first_datum_key, first_datum_key)
         operator.eq(first_datum_key, first_datum_key)
         operator.lt(first_datum_key, first_datum_key)
         
-    except:
+    except TypeError:
         
         raise RuntimeError(
             translate("参数 `key` 的返回值应支持大于、等于和小于运算符！")
