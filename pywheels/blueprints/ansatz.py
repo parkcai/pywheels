@@ -154,12 +154,9 @@ class Ansatz:
             raise RuntimeError(
                 translate("两个 Ansatz 变量列表相同方可相加！")
             )   
-            
-        self._linear_enhance()
-        other._linear_enhance()
-        
-        left_expression = self._to_expression()
-        right_expression = other._to_expression()
+
+        left_expression = _linear_enhance(self._expression, self._param_num)
+        right_expression = _linear_enhance(other._expression, other._param_num)
         
         right_expression = _get_standard_order_expression(
             expression = right_expression,
@@ -346,80 +343,6 @@ class Ansatz:
             )
 
         return best_params, best_output
-    
-    
-    def _linear_enhance(
-        self,
-    )-> None:
-        
-        def is_param_multiplied(node):
-
-            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
-                
-                left = node.left
-                right = node.right
-
-                left_is_param = isinstance(left, ast.Name) and left.id.startswith('param')
-                right_is_param = isinstance(right, ast.Name) and right.id.startswith('param')
-                
-                return left_is_param or right_is_param
-            
-            return False
-        
-        def is_param_divided(node):
-
-            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-                
-                right = node.right
-                
-                return isinstance(right, ast.Name) and right.id.startswith('param')
-            
-            return False
-        
-        def add_level_flatten(node):
-            
-            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-                return add_level_flatten(node.left) + add_level_flatten(node.right)
-            
-            else:
-                return [node]
-        
-        tree = ast.parse(
-            source = self._expression, 
-            mode = "eval",
-        )
-        
-        add_level_terms = add_level_flatten(tree.body)
-        
-        new_add_level_terms = []
-        additional_param_no = self._param_num + 1
-        
-        for node in add_level_terms:
-            
-            source = astor.to_source(node).strip()
-
-            if is_param_multiplied(node) or is_param_divided(node):
-                new_add_level_terms.append(source)
-                
-            else:
-                new_add_level_terms.append(
-                    f"param{additional_param_no} * {source}"
-                )
-                additional_param_no += 1
-            
-        linear_enhanced_expression = ""
-        
-        for index, enhanced_term in enumerate(new_add_level_terms):
-            
-            if index: linear_enhanced_expression += " + "
-            
-            linear_enhanced_expression += enhanced_term
-    
-        self._set_value(
-            expression = linear_enhanced_expression,
-            variables = self._variables,
-            functions = self._functions,
-        )
 
 
 _check_ansatz_format_error_info_lock = Lock() 
@@ -626,4 +549,80 @@ def _get_standard_order_expression(
         return f"param{param_map[old_index]}"
     
     return pattern.sub(replace, expression)
+
+
+def _linear_enhance(
+    expression: str,
+    param_num: int,
+)-> str:
+    
+    def is_single_param(node):
+        return isinstance(node, ast.Name) and node.id.startswith('param')
+    
+    def is_param_multiplied(node):
+
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+            
+            left = node.left
+            right = node.right
+
+            left_is_param = isinstance(left, ast.Name) and left.id.startswith('param')
+            right_is_param = isinstance(right, ast.Name) and right.id.startswith('param')
+            
+            return left_is_param or right_is_param
+        
+        return False
+    
+    def is_param_divided(node):
+
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            
+            right = node.right
+            return isinstance(right, ast.Name) and right.id.startswith('param')
+        
+        return False
+    
+    def add_level_flatten(node):
+        
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            return add_level_flatten(node.left) + add_level_flatten(node.right)
+        
+        else:
+            return [node]
+    
+    tree = ast.parse(
+        source = expression, 
+        mode = "eval",
+    )
+    
+    add_level_terms = add_level_flatten(tree.body)
+    
+    new_add_level_terms = []
+    additional_param_no = param_num + 1
+    
+    for node in add_level_terms:
+        
+        source = astor.to_source(node).strip()
+
+        if is_single_param(node) or is_param_multiplied(node) or is_param_divided(node):
+            new_add_level_terms.append(source)
+            
+        else:
+            
+            new_add_level_terms.append(
+                f"param{additional_param_no} * {source}"
+            )
+            
+            additional_param_no += 1
+        
+    linear_enhanced_expression = ""
+    
+    for index, enhanced_term in enumerate(new_add_level_terms):
+        
+        if index: linear_enhanced_expression += " + "
+        
+        linear_enhanced_expression += enhanced_term
+
+    return linear_enhanced_expression
+
 
