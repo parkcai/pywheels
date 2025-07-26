@@ -403,7 +403,7 @@ class Ansatz:
                 
             else:
                 new_add_level_terms.append(
-                    f"param{additional_param_no} * ({source})"
+                    f"param{additional_param_no} * {source}"
                 )
                 additional_param_no += 1
             
