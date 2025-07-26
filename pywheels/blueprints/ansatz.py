@@ -352,6 +352,30 @@ class Ansatz:
         self,
     )-> None:
         
+        def is_param_multiplied(node):
+
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+                
+                left = node.left
+                right = node.right
+
+                left_is_param = isinstance(left, ast.Name) and left.id.startswith('param')
+                right_is_param = isinstance(right, ast.Name) and right.id.startswith('param')
+                
+                return left_is_param or right_is_param
+            
+            return False
+        
+        def is_param_divided(node):
+
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+                
+                right = node.right
+                
+                return isinstance(right, ast.Name) and right.id.startswith('param')
+            
+            return False
+        
         def add_level_flatten(node):
             
             if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
@@ -373,12 +397,15 @@ class Ansatz:
         for node in add_level_terms:
             
             source = astor.to_source(node).strip()
-            
-            new_add_level_terms.append(
-                f"param{additional_param_no} * ({source})"
-            )
-            
-            additional_param_no += 1
+
+            if is_param_multiplied(node) or is_param_divided(node):
+                new_add_level_terms.append(source)
+                
+            else:
+                new_add_level_terms.append(
+                    f"param{additional_param_no} * ({source})"
+                )
+                additional_param_no += 1
             
         linear_enhanced_expression = ""
         
