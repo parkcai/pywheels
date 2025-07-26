@@ -644,8 +644,8 @@ def _is_top_level_bracketed(
         if char == "(": stack += 1
         if char == ")": stack -= 1
         
-        if not stack: return True
+        if not stack: return False
         
-    return False
+    return True
 
 
