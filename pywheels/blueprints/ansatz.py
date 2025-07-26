@@ -603,6 +603,9 @@ def _linear_enhance(
     for node in add_level_terms:
         
         source = astor.to_source(node).strip()
+        
+        if _is_top_level_bracketed(source):
+            source = source[1:-1]
 
         if is_single_param(node) or is_param_multiplied(node) or is_param_divided(node):
             new_add_level_terms.append(source)
@@ -624,5 +627,25 @@ def _linear_enhance(
         linear_enhanced_expression += enhanced_term
 
     return linear_enhanced_expression
+
+
+def _is_top_level_bracketed(
+    legal_expression: str,
+)-> bool:
+    
+    if not legal_expression: return False
+    
+    if legal_expression[0] != "(": return False
+    
+    stack = 0
+    
+    for char in legal_expression[:-1]:
+        
+        if char == "(": stack += 1
+        if char == ")": stack -= 1
+        
+        if not stack: return True
+        
+    return False
 
 
