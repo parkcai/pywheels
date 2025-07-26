@@ -70,7 +70,8 @@ def _sliding_window_best(
         possible_best_students.append(student)
         
         # 出结果
-        results.append(data[possible_best_students[0]])
+        if student >= window_size - 1:
+            results.append(data[possible_best_students[0]])
         
     return results
 
