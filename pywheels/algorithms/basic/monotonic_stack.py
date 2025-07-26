@@ -7,7 +7,6 @@ from typing import Callable
 from typing import Protocol
 from typing import runtime_checkable
 from ...type_tools.basic import is_same_type
-from ...type_tools.basic import is_hashable
 from ...i18n import translate
 
 
@@ -44,35 +43,14 @@ def _next_qualified_element(
         return_index = return_index,
         fill_factory = fill_factory,
     )
-    
-    key_dict = {}
-    hashable = is_hashable(data[0])
-    
-    def get_key(datum):
-        
-        if hashable:
-            
-            if datum not in key_dict:
-                key_dict[datum] = key(datum)
-            
-            return key_dict[datum]
-        
-        else:
-            
-            datum_id = id(datum)
-            
-            if datum_id not in key_dict:
-                key_dict[datum_id] = key(datum)
-            
-            return key_dict[datum_id]
-        
+
     def is_qualified_for(
         datum1: DatumType, 
         datum2: DatumType,
     )-> bool:
         
-        datum1_key = get_key(datum1)
-        datum2_key = get_key(datum2)
+        datum1_key = key(datum1)
+        datum2_key = key(datum2)
         
         return (qualified_means_greater and datum2_key > datum1_key) \
             or (not qualified_means_greater and datum2_key < datum1_key) \
