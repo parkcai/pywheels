@@ -134,6 +134,45 @@ class Ansatz:
                 ) % (mode)
             )
             
+            
+    def mutate(
+        self,
+    )-> None:
+        
+        tree = ast.parse(
+            source = self._expression,
+            mode = "eval",
+        )
+
+        class FuncMutator(ast.NodeTransformer):
+            def __init__(self, functions, rand_gen):
+                self.functions = functions
+                self.rand_gen = rand_gen
+
+            def visit_Call(self, node):
+                if isinstance(node.func, ast.Name) and node.func.id in self.functions:
+                    candidates = [f for f in self.functions if f != node.func.id]
+                    if candidates:
+                        new_func_name = self.rand_gen.choice(candidates)
+                        node.func = ast.copy_location(ast.Name(id = new_func_name, ctx = ast.Load()), node.func)
+                self.generic_visit(node)
+                return node
+
+        transformer = FuncMutator(
+            functions = self._functions,
+            rand_gen = self._random_generator,
+        )
+
+        mutated_tree = transformer.visit(tree)
+        ast.fix_missing_locations(mutated_tree)
+        mutated_expression = astor.to_source(mutated_tree).strip()
+
+        self._set_value(
+            expression = mutated_expression,
+            variables = self._variables,
+            functions = self._functions,
+        )
+            
     # ----------------------------- 重载运算符 ----------------------------- 
     
     def __add__(
