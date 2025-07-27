@@ -72,7 +72,7 @@ class Ansatz:
             functions = functions,
         )
         
-        self._standardize_order()
+        self._standardize()
         
     # ----------------------------- 外部动作 -----------------------------   
         
@@ -172,6 +172,8 @@ class Ansatz:
             variables = self._variables,
             functions = self._functions,
         )
+        
+        self._standardize()
             
     # ----------------------------- 重载运算符 ----------------------------- 
     
@@ -249,7 +251,7 @@ class Ansatz:
         self._param_num = ansatz_param_num
         
         
-    def _standardize_order(
+    def _standardize(
         self,
     )-> None:
         
@@ -257,6 +259,9 @@ class Ansatz:
             expression = self._expression,
             start_no = 1,
         )
+        
+        while _is_top_level_bracketed(standard_expression):
+            standard_expression = standard_expression[1:-1]
         
         self._set_value(
             expression = standard_expression,
