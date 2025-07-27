@@ -160,7 +160,11 @@ class Ansatz:
         
         right_expression = _get_standard_order_expression(
             expression = right_expression,
-            start_no = self._param_num + 1,
+            start_no = Ansatz(
+                expression = left_expression,
+                variables = self._variables,
+                functions = self._functions,
+            ).get_param_num() + 1,
         )
 
         return Ansatz(
@@ -578,14 +582,28 @@ def _linear_enhance(
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
             
             right = node.right
-            return isinstance(right, ast.Name) and right.id.startswith('param')
+            left = node.left
+            
+            return (isinstance(right, ast.Name) and right.id.startswith('param')) \
+                or (isinstance(left, ast.Name) and left.id.startswith('param'))
         
         return False
+    
+    def remove_uadd(node):
+        
+        while isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.UAdd):
+            node = node.operand
+            
+        return node
     
     def add_level_flatten(node):
         
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
             return add_level_flatten(node.left) + add_level_flatten(node.right)
+        
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Sub):
+            neg_right = ast.UnaryOp(op = ast.USub(), operand = node.right)
+            return add_level_flatten(node.left) + [neg_right]
         
         else:
             return [node]
@@ -602,8 +620,10 @@ def _linear_enhance(
     
     for node in add_level_terms:
         
-        source = astor.to_source(node).strip()
+        node = remove_uadd(node)
         
+        source = astor.to_source(node).strip()
+
         if _is_top_level_bracketed(source):
             source = source[1:-1]
 
