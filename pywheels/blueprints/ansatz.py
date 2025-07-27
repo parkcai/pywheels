@@ -289,7 +289,7 @@ class Ansatz:
             )
 
         param_dict = {
-            f"param{i + 1}": value for i, value in enumerate(params)
+            f"param{i + 1}": float(value) for i, value in enumerate(params)
         }
 
         tree = ast.parse(
