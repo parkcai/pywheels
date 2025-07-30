@@ -22,6 +22,5 @@ setup(
         "openpyxl>=3.0.10",
         "pandas>=1.5.0",
         "astor>=0.8.0",
-        "optuna >= 4.4.0",
     ],
 )

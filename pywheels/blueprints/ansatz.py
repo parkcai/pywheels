@@ -438,42 +438,34 @@ class Ansatz:
             value = numeric_ansatz_user(expr)
             return value if do_minimize else -value
 
-        def optuna_objective(trial) -> float:
-            params = [
-                trial.suggest_float(f"x{i}", low, high)
-                for i, (low, high) in enumerate(param_ranges)
-            ]
-            return objective(params)
+        best_params = None
+        best_output = float('inf') if do_minimize else float('-inf')
 
-        study = optuna.create_study(
-            direction = "minimize" if do_minimize else "maximize"
-        )
-
-        study.optimize(
-            func = optuna_objective, 
-            n_trials = trial_num
-        )
-
-        init_params = [
-            study.best_params[f"x{i}"]
-            for i in range(len(param_ranges))
-        ]
-
-        res = minimize(
-            fun = objective,
-            x0 = init_params,
-            bounds = param_ranges,
-            method = 'L-BFGS-B'
-        )
-
-        if not res.success:
+        for _ in range(trial_num):
             
-            raise RuntimeError(
-                translate("L-BFGS-B 在贝叶斯初始化点上未成功收敛。")
+            init_params = self._generate_random_params(param_ranges)
+
+            res = minimize(
+                fun = objective,
+                x0 = init_params,
+                bounds = param_ranges,
+                method = 'L-BFGS-B'
             )
 
-        best_params = res.x.tolist()
-        best_output = res.fun if do_minimize else -res.fun
+            if not res.success:
+                continue
+
+            score = res.fun if do_minimize else -res.fun
+
+            if ((score < best_output) if do_minimize else (score > best_output)):
+                best_output = score
+                best_params = res.x.tolist()
+
+        if best_params is None:
+            
+            raise RuntimeError(
+                translate("优化器在所有初始点上均未成功收敛。")
+            )
 
         return best_params, best_output
 
