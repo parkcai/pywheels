@@ -213,6 +213,82 @@ class Ansatz:
             variables = self._variables,
             functions = list(set(self._functions) | set(other._functions)),
         )
+        
+        
+    def __mul__(
+        self, 
+        other: Ansatz,
+    )-> Ansatz:
+        
+        if not isinstance(other, Ansatz):
+            
+            raise NotImplementedError(
+                translate(
+                    "无法将 Ansatz 与 %s 类型的对象相乘！"
+                ) % (other.__class__.__name__)
+            )
+            
+        if self._variables != other._variables:
+            
+            raise RuntimeError(
+                translate("两个 Ansatz 变量列表相同方可相乘！")
+            )   
+
+        left_expression = _linear_enhance(self._expression, self._param_num)
+        right_expression = _linear_enhance(other._expression, other._param_num)
+        
+        right_expression = _get_standard_order_expression(
+            expression = right_expression,
+            start_no = Ansatz(
+                expression = left_expression,
+                variables = self._variables,
+                functions = self._functions,
+            ).get_param_num() + 1,
+        )
+
+        return Ansatz(
+            expression = f"({left_expression}) * ({right_expression})",
+            variables = self._variables,
+            functions = list(set(self._functions) | set(other._functions)),
+        )
+        
+        
+    def __div__(
+        self, 
+        other: Ansatz,
+    )-> Ansatz:
+        
+        if not isinstance(other, Ansatz):
+            
+            raise NotImplementedError(
+                translate(
+                    "无法将 Ansatz 与 %s 类型的对象相除！"
+                ) % (other.__class__.__name__)
+            )
+            
+        if self._variables != other._variables:
+            
+            raise RuntimeError(
+                translate("两个 Ansatz 变量列表相同方可相除！")
+            )   
+
+        left_expression = _linear_enhance(self._expression, self._param_num)
+        right_expression = _linear_enhance(other._expression, other._param_num)
+        
+        right_expression = _get_standard_order_expression(
+            expression = right_expression,
+            start_no = Ansatz(
+                expression = left_expression,
+                variables = self._variables,
+                functions = self._functions,
+            ).get_param_num() + 1,
+        )
+
+        return Ansatz(
+            expression = f"({left_expression}) / ({right_expression})",
+            variables = self._variables,
+            functions = list(set(self._functions) | set(other._functions)),
+        )
 
     # ----------------------------- 内部动作 ----------------------------- 
     
