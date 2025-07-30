@@ -254,7 +254,7 @@ class Ansatz:
         )
         
         
-    def __div__(
+    def __truediv__(
         self, 
         other: Ansatz,
     )-> Ansatz:
