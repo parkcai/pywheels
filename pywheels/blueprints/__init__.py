@@ -1,8 +1,8 @@
 from .ansatz import Ansatz
-from .colean import LeanProxy
+from .colean import CoLeanRechecker
 
 
 __all__ = [
     "Ansatz",
-    "LeanProxy",
+    "CoLeanRechecker",
 ]
