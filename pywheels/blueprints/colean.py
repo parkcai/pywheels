@@ -1,5 +1,6 @@
 import os
 import re
+from typing import Set
 from typing import Dict
 from typing import List
 from typing import Tuple
@@ -21,15 +22,18 @@ class CoLeanRechecker:
     
     def __init__(
         self,
-        keyword: str = "Claim",
+        claim_keyword: str = "Claim",
+        prop_field: str = "prop",
     )-> None:
         
         self._lock: Lock = Lock()
         
-        self._keyword: str = keyword
+        self._claim_keyword = claim_keyword
+        self._prop_field = prop_field
         
         self._revalidator_name_to_func: \
             Dict[str, Callable[[str, List[str]], bool]] = {}
+        self._whitelist_axioms: Set[str] = set()
             
         self._last_invalid_cause: str = ""
         
@@ -64,6 +68,26 @@ class CoLeanRechecker:
             else:
                 del self._revalidator_name_to_func[revalidator_name]
                 
+    
+    def add_whitelist_axioms(
+        self,
+        whitelist_axioms: List[str],
+    )-> None:
+        
+        with self._lock:
+            
+            for axiom in whitelist_axioms:
+                self._whitelist_axioms.add(axiom)
+                
+                
+    def remove_whitelist_axiom(
+        self,
+        whitelist_axiom: str,
+    )-> None:
+        
+        with self._lock:
+            self._whitelist_axioms.remove(whitelist_axiom)
+                
                 
     def revalidate(
         self,
@@ -86,24 +110,56 @@ class CoLeanRechecker:
                     
             axiom_pattern = re.compile(r'axiom\s+(\w+)')
             
-            for m in axiom_pattern.finditer(lean_code):
+            for current_match in axiom_pattern.finditer(lean_code):
                 
-                ident = m.group(1)
+                ident = current_match.group(1)
                 
-                if ident != self._keyword:
+                if ident != self._claim_keyword and ident not in self._whitelist_axioms:
                     
                     self._last_invalid_cause = translate(
-                        "在允许引入的公理 %s 以外，lean code 中出现了公理 %s ，CoLean 系统无法保证其正确性！"
-                    ) % (self._keyword, ident)
+                        "在关键字 %s 和白名单公理之外，lean code 中出现了公理 %s ，CoLean 系统无法保证其正确性！"
+                    ) % (self._claim_keyword, ident)
                     
                     return False
-
-            axiom_spans = [m.span() for m in axiom_pattern.finditer(lean_code)]
-            keyword_pattern = re.compile(rf'\b{self._keyword}\b')
-
-            for m in keyword_pattern.finditer(lean_code):
                 
-                pos = m.start()
+            claim_structure_pattern = re.compile(
+                r"structure\s+(\w+)\s+where\s+"
+                r"(\w+)\s*\:\s*Prop\s+\w+\s*\:\s*(\w+)\s+axiom\s+"
+                f"{self._claim_keyword}"
+                r"\s*\(\s*(\w+)\s*\:\s*Prop\s*\)"
+                r"\s*\(\s*\w+\s*\:\s*List\s+(\w+)\s*\)"
+                r"\s*\(\s*\w+\s*\:\s*String\s*\)"
+                r"\s*\:\s*(\w+)"
+            )
+            matchs = claim_structure_pattern.findall(lean_code)
+            
+            if len(matchs) != 1:
+                
+                self._last_invalid_cause = translate(
+                    "在 lean code 中匹配到了 %d 个 claim structure（定义关键字 %s 的结构），但应有且仅有一个！"
+                ) % (len(matchs), self._claim_keyword)
+                
+                return False
+            
+            claim_structure_match = matchs[0]
+            fact, prop_field, prop_field2, \
+                claimed_prop, fact2, claimed_prop2 = claim_structure_match
+                
+            if fact != fact2 or len(set([self._prop_field, prop_field, prop_field2])) != 1 \
+                or claimed_prop != claimed_prop2:
+                    
+                self._last_invalid_cause = translate(
+                    "claim structure（定义关键字 %s 的结构）格式有误！"
+                ) % (self._claim_keyword)
+                
+                return False
+                
+            axiom_spans = [m.span() for m in axiom_pattern.finditer(lean_code)]
+            keyword_pattern = re.compile(rf'\b{self._claim_keyword}\b')
+
+            for current_match in keyword_pattern.finditer(lean_code):
+                
+                pos = current_match.start()
                 
                 if any(start <= pos < end for start, end in axiom_spans):
                     continue
@@ -111,18 +167,22 @@ class CoLeanRechecker:
                 tail_text = lean_code[pos:]
                 result = self._revalidate_extract_claim_parts(
                     text = tail_text, 
-                    start_pos = len(self._keyword),
+                    start_pos = len(self._claim_keyword),
                 )
 
                 if result is None:
                     self._last_invalid_cause = translate(
                         "在位置 %d 发现关键字 %s 后，未能找到符合格式的推理外包逻辑！"
-                    ) % (pos, self._keyword)
+                    ) % (pos, self._claim_keyword)
                     return False
 
                 prop, verified_facts_raw, revalidator_name = result
 
-                prop_pattern = re.compile(r'\{prop\s*:=\s*([^,}]+)')
+                prop_pattern = re.compile(
+                    r"\{"
+                    f"{self._prop_field}"
+                    r"\s*:=\s*([^,}]+)"
+                )
                 verified_props = prop_pattern.findall(verified_facts_raw)
 
                 if revalidator_name not in self._revalidator_name_to_func:
