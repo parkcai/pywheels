@@ -124,7 +124,7 @@ class CoLeanRechecker:
                 
             claim_structure_pattern = re.compile(
                 r"structure\s+(\w+)\s+where\s+"
-                r"(\w+)\s*\:\s*Prop\s+\w+\s*\:\s*(\w+)\s+axiom\s+"
+                r"(\w+)\s*\:\s*Prop\s+(\w+)\s*\:\s*(\w+)\s+axiom\s+"
                 f"{self._claim_keyword}"
                 r"\s*\(\s*(\w+)\s*\:\s*Prop\s*\)"
                 r"\s*\(\s*\w+\s*\:\s*List\s+(\w+)\s*\)"
@@ -142,7 +142,7 @@ class CoLeanRechecker:
                 return False
             
             claim_structure_match = matchs[0]
-            fact, prop_field, prop_field2, \
+            fact, prop_field, proof_field, prop_field2, \
                 claimed_prop, fact2, claimed_prop2 = claim_structure_match
                 
             if fact != fact2 or len(set([self._prop_field, prop_field, prop_field2])) != 1 \
@@ -177,12 +177,16 @@ class CoLeanRechecker:
                     return False
 
                 prop, verified_facts_raw, revalidator_name = result
-
+                
                 prop_pattern = re.compile(
                     r"\{"
                     f"{self._prop_field}"
-                    r"\s*:=\s*([^,}]+)"
+                    r"\s*:=\s*(.*?)(?=,\s*"
+                    f"{proof_field}"
+                    r"\s*:=|\})",
+                    re.DOTALL
                 )
+                
                 verified_props = prop_pattern.findall(verified_facts_raw)
 
                 if revalidator_name not in self._revalidator_name_to_func:
@@ -198,8 +202,8 @@ class CoLeanRechecker:
                 if not func(prop, verified_props):
                     
                     self._last_invalid_cause = translate(
-                        "验证器 %s 复核命题 %s 失败！"
-                    ) % (revalidator_name, prop)
+                        "验证器 %s 复核命题 %s 失败：命题 %s 不能导出 %s！"
+                    ) % (revalidator_name, prop, ", ".join(verified_props), prop)
                     
                     return False
 
