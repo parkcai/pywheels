@@ -1,5 +1,6 @@
 import os
 import re
+from tqdm import tqdm
 from typing import Set
 from typing import Dict
 from typing import List
@@ -94,9 +95,12 @@ class CoLeanRechecker:
         lean_code: str,
         mode: Literal["file", "string"] = "file",
         encoding: str = "UTF-8",
+        show_progress: bool = False,
     )-> bool:
         
         with self._lock:
+            
+            if show_progress: print(translate("[CoLean] 复核开始"))
         
             if mode == "file":
                 
@@ -104,13 +108,18 @@ class CoLeanRechecker:
                     file_path = lean_code,
                     encoding = encoding,
                 )
+                
+            if show_progress: print(translate("[CoLean] 正在删除注释"))
                     
             lean_code = re.sub(r'--.*?$', '', lean_code, flags=re.MULTILINE)
             lean_code = re.sub(r'/-(.|\n)*?-/','', lean_code, flags=re.DOTALL)
+            
+            if show_progress: print(translate("[CoLean] 正在检查自定义公理"))
                     
             axiom_pattern = re.compile(r'axiom\s+(\w+)')
+            axiom_match = axiom_pattern.finditer(lean_code)
             
-            for current_match in axiom_pattern.finditer(lean_code):
+            for current_match in axiom_match:
                 
                 ident = current_match.group(1)
                 
@@ -120,7 +129,14 @@ class CoLeanRechecker:
                         "在关键字 %s 和白名单公理之外，lean code 中出现了公理 %s ，CoLean 系统无法保证其正确性！"
                     ) % (self._claim_keyword, ident)
                     
+                    if show_progress: print(
+                        translate("[CoLean] 复核结束；结果：失败，%s")
+                        % (self._last_invalid_cause)
+                    )
+                    
                     return False
+                
+            if show_progress: print(translate("[CoLean] 正在检查 Claim Structure"))
                 
             claim_structure_pattern = re.compile(
                 r"structure\s+(\w+)\s+where\s+"
@@ -139,6 +155,11 @@ class CoLeanRechecker:
                     "在 lean code 中匹配到了 %d 个 claim structure（定义关键字 %s 的结构），但应有且仅有一个！"
                 ) % (len(matchs), self._claim_keyword)
                 
+                if show_progress: print(
+                    translate("[CoLean] 复核结束；结果：失败，%s")
+                    % (self._last_invalid_cause)
+                )
+                
                 return False
             
             claim_structure_match = matchs[0]
@@ -152,17 +173,23 @@ class CoLeanRechecker:
                     "claim structure（定义关键字 %s 的结构）格式有误！"
                 ) % (self._claim_keyword)
                 
-                return False
+                if show_progress: print(
+                    translate("[CoLean] 复核结束；结果：失败，%s")
+                    % (self._last_invalid_cause)
+                )
                 
-            axiom_spans = [m.span() for m in axiom_pattern.finditer(lean_code)]
-            keyword_pattern = re.compile(rf'\b{self._claim_keyword}\b')
+                return False
+            
+            if show_progress: print(translate("[CoLean] 正在逐一复核 claims"))
 
-            for current_match in keyword_pattern.finditer(lean_code):
+            keyword_pattern = re.compile(rf'\b{self._claim_keyword}\b')
+            keyword_match = list(keyword_pattern.finditer(lean_code))[1:]
+            
+            if show_progress: keyword_match = tqdm(keyword_match)
+
+            for current_match in keyword_match:
                 
                 pos = current_match.start()
-                
-                if any(start <= pos < end for start, end in axiom_spans):
-                    continue
 
                 tail_text = lean_code[pos:]
                 result = self._revalidate_extract_claim_parts(
@@ -171,9 +198,16 @@ class CoLeanRechecker:
                 )
 
                 if result is None:
+                    
                     self._last_invalid_cause = translate(
                         "在位置 %d 发现关键字 %s 后，未能找到符合格式的推理外包逻辑！"
                     ) % (pos, self._claim_keyword)
+                    
+                    if show_progress: print(
+                        translate("[CoLean] 复核结束；结果：失败，%s")
+                        % (self._last_invalid_cause)
+                    )
+                    
                     return False
 
                 prop, verified_facts_raw, revalidator_name = result
@@ -195,6 +229,11 @@ class CoLeanRechecker:
                         "验证器 %s 未知！"
                     ) % revalidator_name
                     
+                    if show_progress: print(
+                        translate("[CoLean] 复核结束；结果：失败，%s")
+                        % (self._last_invalid_cause)
+                    )
+                    
                     return False
 
                 func = self._revalidator_name_to_func[revalidator_name]
@@ -202,10 +241,17 @@ class CoLeanRechecker:
                 if not func(prop, verified_props):
                     
                     self._last_invalid_cause = translate(
-                        "验证器 %s 复核命题 %s 失败：命题 %s 不能导出 %s！"
+                        "验证器 %s 复核命题 %s 失败：此验证器不支持命题 %s 导出 %s！"
                     ) % (revalidator_name, prop, ", ".join(verified_props), prop)
                     
+                    if show_progress: print(
+                        translate("[CoLean] 复核结束；结果：失败，%s")
+                        % (self._last_invalid_cause)
+                    )
+                    
                     return False
+                
+            if show_progress: print(translate("[CoLean] 复核结束；结果：成功！"))
 
             return True
     
