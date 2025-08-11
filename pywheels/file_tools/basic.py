@@ -76,14 +76,19 @@ def append_to_file(
     content: str,
     end: str = "\n",
     encoding: str = "UTF-8",
+    immediate_flush: bool = True,
+    buffering: Optional[int] = None,
 ):
 
     with open(
         file = file_path, 
         mode = "a", 
-        encoding = encoding
-    ) as file:
-        file.write(content + end)
+        encoding = encoding,
+        buffering = -1 if buffering is None else buffering, 
+    ) as file_pointer:
+        
+        file_pointer.write(content + end)
+        if immediate_flush: file_pointer.flush()
         
         
 tempfile_lock = Lock()
