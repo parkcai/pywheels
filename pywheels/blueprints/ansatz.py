@@ -94,9 +94,13 @@ class Ansatz:
     def reduce_to_numeric_ansatz(
         self,
         params: List[float],
+        stringify_format: str = ".8g",
     )-> str:
     
-        return self._reduce_to_numeric_ansatz(params)
+        return self._reduce_to_numeric_ansatz(
+            params = params,
+            stringify_format = stringify_format,
+        )
     
     
     def apply_to(
@@ -357,6 +361,7 @@ class Ansatz:
     def _reduce_to_numeric_ansatz(
         self,
         params: List[float],
+        stringify_format: str = ".8g",
     )-> str:
         
         if len(params) != self._param_num:
@@ -366,7 +371,8 @@ class Ansatz:
             )
 
         param_dict = {
-            f"param{i + 1}": float(value) for i, value in enumerate(params)
+            f"param{i + 1}": float(format(value, stringify_format)) 
+            for i, value in enumerate(params)
         }
 
         tree = ast.parse(
