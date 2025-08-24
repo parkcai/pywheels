@@ -4,7 +4,7 @@ from setuptools import find_packages
 
 setup(
     name = "pywheels",
-    version = "0.6.8",
+    version = "0.6.8.1",
     packages = find_packages(),
     description = "Light-weight Python wheels",
     author = "parkcai",

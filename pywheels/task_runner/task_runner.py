@@ -1,6 +1,7 @@
 import sys
 import shlex
 import subprocess
+from tqdm import tqdm
 from concurrent.futures import as_completed
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
@@ -154,16 +155,17 @@ def execute_python_script(
 
 
 TaskIndexerType = TypeVar("TaskIndexerType")
-TaskInputType = TypeVar("TaskInputType")
 TaskOutputType = TypeVar("TaskOutputType")
 
 def run_tasks_concurrently(
-    task: Callable[[TaskInputType], TaskOutputType],
+    task: Callable[..., TaskOutputType],
     task_indexers: List[TaskIndexerType],
-    task_inputs: List[TaskInputType],
+    task_inputs: List[Tuple[Any, ...]],
     method: Literal["ThreadPoolExecutor", "ProcessPoolExecutor"] = "ThreadPoolExecutor",
     max_workers: Optional[int] = None,
-) -> Dict[TaskIndexerType, TaskOutputType]:
+    show_progress_bar: bool = True,
+    progress_bar_description: Optional[str] = None,
+)-> Dict[TaskIndexerType, TaskOutputType]:
     
     """
     Execute multiple tasks concurrently using thread or process pool, returning indexed results.
@@ -172,15 +174,18 @@ def run_tasks_concurrently(
       - Validate input parameters for consistency and correctness
       - Create appropriate executor (thread or process pool)
       - Submit all tasks to the executor with proper indexing
+      - Display progress bar to monitor execution (optional)
       - Collect and map results to their respective indexers
       - Handle exceptions and provide meaningful error information
 
     Args:
-        task: Python callable to execute for each input (accepts single argument, returns output)
+        task: Python callable to execute for each input (accepts variable arguments, returns output)
         task_indexers: List of unique identifiers for each task (e.g., IDs, names, or keys)
-        task_inputs: List of input arguments, each will be passed to the task function
+        task_inputs: List of input argument tuples, each will be unpacked and passed to the task function
         method: Execution method, either "ThreadPoolExecutor" (default) or "ProcessPoolExecutor"
         max_workers: Maximum number of concurrent workers. None uses default (CPU count for processes)
+        show_progress_bar: Whether to display a progress bar during execution. Default True.
+        progress_bar_description: Custom description for the progress bar. Default None.
 
     Returns:
         Dict[TaskIndexerType, TaskOutputType]: Dictionary mapping each task indexer to its output result
@@ -190,13 +195,13 @@ def run_tasks_concurrently(
         RuntimeError: When any task execution fails with an exception
 
     Example:
-        >>> def process_item(item: str) -> int:
-        ...     return len(item)
+        >>> def process_data(name: str, value: int, multiplier: float) -> float:
+        ...     return value * multiplier
         >>> indexers = ["task1", "task2", "task3"]
-        >>> inputs = ["hello", "world", "python"]
-        >>> results = run_tasks_concurrently(process_item, indexers, inputs)
+        >>> inputs = [("item1", 10, 1.5), ("item2", 20, 2.0), ("item3", 30, 0.5)]
+        >>> results = run_tasks_concurrently(process_data, indexers, inputs, show_progress_bar=True)
         >>> print(results)
-        {"task1": 5, "task2": 5, "task3": 6}
+        {"task1": 15.0, "task2": 40.0, "task3": 15.0}
     """
 
     if len(task_indexers) != len(task_inputs):
@@ -224,10 +229,20 @@ def run_tasks_concurrently(
         
         for indexer, input_data in zip(task_indexers, task_inputs):
             
-            future = executor.submit(task, input_data)
+            future = executor.submit(task, *input_data)
             future_to_indexer[future] = indexer
+            
+        future_iterator = as_completed(future_to_indexer)
+        
+        if show_progress_bar:
+            
+            future_iterator = tqdm(
+                iterable = future_iterator,
+                total = len(task_indexers),
+                desc = progress_bar_description,
+            )
 
-        for future in as_completed(future_to_indexer):
+        for future in future_iterator:
             
             indexer = future_to_indexer[future]
             
