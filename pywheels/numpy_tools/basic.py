@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import ndarray
 from numpy.typing import ArrayLike
-from typing import Tuple
+from ..typing import *
 
 
 __all__ = [

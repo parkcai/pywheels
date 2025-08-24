@@ -1,5 +1,5 @@
-from typing import Callable
 from scipy.integrate import quad
+from ..typing import *
 
 
 __all__ = [

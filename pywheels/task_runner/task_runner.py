@@ -1,14 +1,19 @@
 import sys
 import shlex
 import subprocess
-from ..file_tools import get_temp_file_path
-from ..file_tools import delete_file
+from concurrent.futures import as_completed
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from ..i18n import translate
+from ..file_tools import delete_file
+from ..file_tools import get_temp_file_path
+from ..typing import *
 
 
 __all__ = [
     "execute_command",
     "execute_python_script",
+    "run_tasks_concurrently",
 ]
 
 
@@ -146,3 +151,95 @@ def execute_python_script(
     )
     
     return result_info
+
+
+TaskIndexerType = TypeVar("TaskIndexerType")
+TaskInputType = TypeVar("TaskInputType")
+TaskOutputType = TypeVar("TaskOutputType")
+
+def run_tasks_concurrently(
+    task: Callable[[TaskInputType], TaskOutputType],
+    task_indexers: List[TaskIndexerType],
+    task_inputs: List[TaskInputType],
+    method: Literal["ThreadPoolExecutor", "ProcessPoolExecutor"] = "ThreadPoolExecutor",
+    max_workers: Optional[int] = None,
+) -> Dict[TaskIndexerType, TaskOutputType]:
+    
+    """
+    Execute multiple tasks concurrently using thread or process pool, returning indexed results.
+
+    This function will:
+      - Validate input parameters for consistency and correctness
+      - Create appropriate executor (thread or process pool)
+      - Submit all tasks to the executor with proper indexing
+      - Collect and map results to their respective indexers
+      - Handle exceptions and provide meaningful error information
+
+    Args:
+        task: Python callable to execute for each input (accepts single argument, returns output)
+        task_indexers: List of unique identifiers for each task (e.g., IDs, names, or keys)
+        task_inputs: List of input arguments, each will be passed to the task function
+        method: Execution method, either "ThreadPoolExecutor" (default) or "ProcessPoolExecutor"
+        max_workers: Maximum number of concurrent workers. None uses default (CPU count for processes)
+
+    Returns:
+        Dict[TaskIndexerType, TaskOutputType]: Dictionary mapping each task indexer to its output result
+
+    Raises:
+        ValueError: When task_indexers and task_inputs have different lengths
+        RuntimeError: When any task execution fails with an exception
+
+    Example:
+        >>> def process_item(item: str) -> int:
+        ...     return len(item)
+        >>> indexers = ["task1", "task2", "task3"]
+        >>> inputs = ["hello", "world", "python"]
+        >>> results = run_tasks_concurrently(process_item, indexers, inputs)
+        >>> print(results)
+        {"task1": 5, "task2": 5, "task3": 6}
+    """
+
+    if len(task_indexers) != len(task_inputs):
+        
+        raise ValueError(
+            translate(
+                "task_indexers and task_inputs must have the same length. Got %d indexers and %d inputs."
+            ) % (len(task_indexers), len(task_inputs))
+        )
+    
+    if not task_indexers: return {}
+    
+    executor_class = {
+        "ThreadPoolExecutor": ThreadPoolExecutor,
+        "ProcessPoolExecutor": ProcessPoolExecutor,
+    }[method]
+    
+    results: Dict[TaskIndexerType, TaskOutputType] = {}
+    
+    with executor_class(
+        max_workers = max_workers
+    ) as executor:
+
+        future_to_indexer: Dict[Any, TaskIndexerType] = {}
+        
+        for indexer, input_data in zip(task_indexers, task_inputs):
+            
+            future = executor.submit(task, input_data)
+            future_to_indexer[future] = indexer
+
+        for future in as_completed(future_to_indexer):
+            
+            indexer = future_to_indexer[future]
+            
+            try:
+                results[indexer] = future.result()
+                
+            except Exception as error:
+
+                raise RuntimeError(
+                    translate(
+                        "Task failed for indexer '%s': %s"
+                    ) % (str(indexer), str(error))
+                ) from error
+    
+    return results
