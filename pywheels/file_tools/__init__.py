@@ -14,6 +14,8 @@ from .table import new_table
 from .table import write_table
 from .table import write_table_item
 from .table import save_table
+from .json import load_from_json
+from .json import save_to_json
 
 
 __all__ = [
@@ -33,4 +35,6 @@ __all__ = [
     "write_table",
     "write_table_item",
     "save_table",
+    "load_from_json",
+    "save_to_json",
 ]

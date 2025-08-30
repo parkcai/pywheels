@@ -3,13 +3,14 @@ import re
 import ast
 import astor
 import random
-import optuna
 from typing import List
 from typing import Tuple
 from typing import Callable
 from threading import Lock
 from scipy.optimize import minimize
+from scipy.optimize import differential_evolution
 from ..i18n import translate
+from ..typing import *
 
 
 __all__ = [
@@ -108,11 +109,11 @@ class Ansatz:
         numeric_ansatz_user: Callable[[str], float],
         param_ranges: List[Tuple[float, float]],
         trial_num: int,
-        mode: str = "random",
+        method: Literal["random", "L-BFGS-B", "differential-evolution"] = "L-BFGS-B",
         do_minimize: bool = True,
     )-> Tuple[List[float], float]:
 
-        if mode == "random":
+        if method == "random":
             
             return self._apply_to_mode_random(
                 numeric_ansatz_user,
@@ -121,22 +122,14 @@ class Ansatz:
                 do_minimize,
             )
 
-        elif mode == "optimize":
-            
+        else:
+
             return self._apply_to_mode_optimize(
                 numeric_ansatz_user,
                 param_ranges,
                 trial_num,
                 do_minimize,
-            )
-
-        else:
-            
-            raise ValueError(
-                translate(
-                    "Ansatz 类的 apply to 动作不支持模式 %s，"
-                    "请使用 `random` 或 `optimize`！"
-                ) % (mode)
+                method,
             )
             
             
@@ -437,9 +430,13 @@ class Ansatz:
         param_ranges: List[Tuple[float, float]],
         trial_num: int,
         do_minimize: bool,
+        method: Literal["L-BFGS-B", "differential-evolution"],
     )-> Tuple[List[float], float]:
 
-        def objective(params: List[float]) -> float:
+        def objective(
+            params: List[float]
+        ) -> float:
+            
             expr = self._reduce_to_numeric_ansatz(params)
             value = numeric_ansatz_user(expr)
             return value if do_minimize else -value
@@ -451,21 +448,39 @@ class Ansatz:
             
             init_params = self._generate_random_params(param_ranges)
 
-            res = minimize(
-                fun = objective,
-                x0 = init_params,
-                bounds = param_ranges,
-                method = 'L-BFGS-B'
-            )
+            if method == "L-BFGS-B":
 
-            if not res.success:
-                continue
+                res = minimize(
+                    fun = objective,
+                    x0 = init_params,
+                    bounds = param_ranges,
+                    method = "L-BFGS-B",
+                )
+                
+            elif method == "differential_evolution":
+                
+                res = differential_evolution(
+                    func = objective,
+                    bounds = param_ranges,
+                    popsize = 15,
+                    mutation = 0.8,
+                    recombination = 0.7,
+                    maxiter = 666,
+                    strategy = "best1bin",
+                    polish = True,
+                    disp = False,
+                    seed = 42,
+                )
+                
+            else: raise NotImplementedError
+
+            if not res.success: continue
 
             score = res.fun if do_minimize else -res.fun
 
-            if ((score < best_output) if do_minimize else (score > best_output)):
-                best_output = score
-                best_params = res.x.tolist()
+            if (score < best_output) if do_minimize else (score > best_output):
+                
+                best_output = score; best_params = res.x.tolist()
 
         if best_params is None:
             
