@@ -4,6 +4,7 @@ import tempfile
 from threading import Lock
 from typing import Optional
 from ..i18n import translate
+from ..typing import *
 
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     "delete_file",
     "copy_file",
     "clear_file",
+    "get_files",
 ]
 
 
@@ -259,3 +261,54 @@ def clear_file(
         
     except FileNotFoundError:
         guarantee_file_exist(file_path)
+        
+        
+def get_files(
+    directory: str,
+    file_type: Literal["all", "files_only", "dirs_only"] = "all",
+)-> List[str]:
+    
+    """
+    获取指定目录下文件的basename列表
+    
+    Args:
+        directory: 目录路径
+        file_type: 文件类型筛选选项
+            - "all": 返回所有文件和目录
+            - "dirs_only": 只返回目录
+            - "files_only": 只返回文件（非目录）
+    
+    Returns:
+        文件basename的列表
+    """
+    
+    if not os.path.exists(directory):
+        
+        raise ValueError(
+            translate("目录 %s 不存在")
+            % (directory)
+        )
+    
+    if not os.path.isdir(directory):
+        
+        raise ValueError(
+            translate("路径 %s 不是目录")
+            % (directory)
+        )
+    
+    result = []
+    
+    for item in os.listdir(directory):
+        
+        item_path = os.path.join(directory, item)
+        
+        if file_type == "all":
+            result.append(item)
+            
+        elif file_type == "dirs_only" and os.path.isdir(item_path):
+            result.append(item)
+            
+        elif file_type == "files_only" and os.path.isfile(item_path):
+            result.append(item)
+    
+    return result
