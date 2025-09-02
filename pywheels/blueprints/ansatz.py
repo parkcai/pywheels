@@ -457,7 +457,7 @@ class Ansatz:
                     method = "L-BFGS-B",
                 )
                 
-            elif method == "differential_evolution":
+            elif method == "differential-evolution":
                 
                 res = differential_evolution(
                     func = objective,
