@@ -266,6 +266,8 @@ def clear_file(
 def get_files(
     directory: str,
     file_type: Literal["all", "files_only", "dirs_only"] = "all",
+    start_with: str = "",
+    end_with: str = "",
 )-> List[str]:
     
     """
@@ -301,6 +303,9 @@ def get_files(
     for item in os.listdir(directory):
         
         item_path = os.path.join(directory, item)
+        
+        if not (item.startswith(start_with) and item.endswith(end_with)):
+            continue
         
         if file_type == "all":
             result.append(item)
