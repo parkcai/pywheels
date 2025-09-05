@@ -268,6 +268,7 @@ def get_files(
     file_type: Literal["all", "files_only", "dirs_only"] = "all",
     start_with: str = "",
     end_with: str = "",
+    behaviour: Literal["return_basenames", "return_full_paths"] = "return_basenames",
 )-> List[str]:
     
     """
@@ -315,5 +316,13 @@ def get_files(
             
         elif file_type == "files_only" and os.path.isfile(item_path):
             result.append(item)
+            
+    if behaviour == "return_basenames":
+        return result
     
-    return result
+    elif behaviour == "return_full_paths":
+        return [f"{directory}/{basename}" for basename in result]
+    
+    else:
+        
+        raise NotImplementedError
