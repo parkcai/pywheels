@@ -331,6 +331,7 @@ def get_files(
 
 def get_lines(
     file_path: str,
+    strip: bool = True,
     encoding: str = "UTF-8",
 )-> List[str]:
     
@@ -340,4 +341,9 @@ def get_lines(
         encoding = encoding,
     ) as file_pointer:
         
-        return file_pointer.readlines()
+        lines = file_pointer.readlines()
+        
+    if strip:
+        lines = [line.strip() for line in lines]
+        
+    return lines
