@@ -16,6 +16,7 @@ __all__ = [
     "copy_file",
     "clear_file",
     "get_files",
+    "get_lines",
 ]
 
 
@@ -326,3 +327,17 @@ def get_files(
     else:
         
         raise NotImplementedError
+
+
+def get_lines(
+    file_path: str,
+    encoding: str = "UTF-8",
+)-> List[str]:
+    
+    with open(
+        file = file_path,
+        mode = "r",
+        encoding = encoding,
+    ) as file_pointer:
+        
+        return file_pointer.readlines()

@@ -6,6 +6,7 @@ from .basic import delete_file
 from .basic import copy_file
 from .basic import clear_file
 from .basic import get_files
+from .basic import get_lines
 from .mat import check_mat_part
 from .mat import load_mat_part
 from .mat import merge_mat_files
@@ -31,6 +32,7 @@ __all__ = [
     "print_table",
     "merge_mat_files",
     "get_files",
+    "get_lines",
     "check_mat_part",
     "load_mat_part",
     "new_table",
