@@ -20,34 +20,36 @@ __all__ = [
 
 
 ansatz_docstring = (
-    "通过提供 expression、variables 和 functions，可以初始化一个 Ansatz 实例，用于表达一类待优化的数学结构。\n"
+    "通过提供 expression、variables、functions 和 constant_whitelist，可以初始化一个 Ansatz 实例，用于表达一类待优化的数学结构。\n"
     "参数说明如下：\n"
     "- expression：一个字符串形式的数学表达式，表示一个带参函数。\n"
     "- variables：允许在 expression 中出现的变量名列表，每个变量名必须以字母或下划线开头，且仅包含字母、数字或下划线。\n"
-    "- functions：允许调用的函数名列表，函数名必须是裸名称（例如 'sin' 而非 'math.sin'），并满足合法标识符规则。\n\n"
+    "- functions：允许调用的函数名列表，函数名必须是裸名称（例如 'sin' 而非 'math.sin'），并满足合法标识符规则。\n"
+    "- constant_whitelist：允许使用的常量列表，可包含标识符型常量（如 'pi'）和数字型常量（如 '0.5'）。\n\n"
 
     "expression 中可以包含：\n"
     "- 上述 variables 中的变量；\n"
     "- 上述 functions 中的函数调用；\n"
     "- 参数 param1, param2, ..., paramN（编号必须从1开始，连续编号，不允许跳号）；\n"
     "- 支持的运算符，包括：+、-、*、/、**（即加减乘除和乘方）；\n"
-    "- 括号，用于表达优先级。\n\n"
+    "- 括号，用于表达优先级；\n"
+    "- constant_whitelist 中列出的常量。\n\n"
 
     "禁止事项：\n"
-    "- 不允许在表达式中使用未在 variables 或 functions 中声明的标识符；\n"
-    "- 不允许使用任何形式的数字常量，例如 '0.5'、'2' 等；\n"
+    "- 不允许在表达式中使用未在 variables、functions 或 constant_whitelist 中声明的标识符；\n"
+    "- 不允许使用任何未在 constant_whitelist 中显式列出的数字常量；\n"
     "- 不允许使用不支持的语法结构，如列表、字典、条件表达式等；\n"
     "- 不允许使用不支持的函数调用形式，例如带模块前缀的函数。\n\n"
 
     "合法示例：\n"
-    "若 variables = ['x', 'y'] 且 functions = ['sin', 'exp']，那么以下表达式是合法的：\n"
-    "- 'param1 * sin(param2 * x)'\n"
-    "- '(param1 * exp(param2 * x) + param3 * y) * param4'\n\n"
+    "若 variables = ['x', 'y']、functions = ['sin', 'exp']、constant_whitelist = ['pi', '0.5', '1']，那么以下表达式是合法的：\n"
+    "- 'param1 * sin(param2 * x + pi)'\n"
+    "- '(param1 * exp(param2 * x) + 0.5 * y) * param4 + 1'\n\n"
 
     "非法示例包括：\n"
     "- 使用未声明变量，如 'z + param1'\n"
     "- 使用未注册函数，如 'cos(param1 * x)' 若 'cos' 不在 functions 中\n"
-    "- 包含常数，如 '(x + param1) * 0.5'\n"
+    "- 使用未在白名单中的常量，如 '(x + param1) * 0.3' 若 '0.3' 不在 constant_whitelist 中\n"
     "- 参数编号不连续，如 'param1 + param3'\n\n"
 
     "通过合法的 ansatz 表达式，可以自动将参数替换为具体数值，用于函数评估或数值最优化等任务。"
@@ -63,15 +65,19 @@ class Ansatz:
         expression: str,
         variables: List[str],
         functions: List[str],
+        constant_whitelist: List[str] = [],
         seed: int  = 42,
     )-> None:
         
         self._random_generator = random.Random(seed)
+        self._check_ansatz_format_error_info = ""
+        self._check_ansatz_format_error_info_lock = Lock() 
         
         self._set_value(
             expression = expression,
             variables = variables,
             functions = functions,
+            constant_whitelist = constant_whitelist,
         )
         
         self._standardize()
@@ -169,6 +175,7 @@ class Ansatz:
             expression = mutated_expression,
             variables = self._variables,
             functions = self._functions,
+            constant_whitelist = self._constant_whitelist,
         )
         
         self._standardize()
@@ -295,11 +302,13 @@ class Ansatz:
         expression: str,
         variables: List[str],
         functions: List[str],
+        constant_whitelist: List[str],
     )-> None:
     
         self._expression = expression
         self._variables = variables
         self._functions = functions
+        self._constant_whitelist = constant_whitelist
 
         self._check_format()
     
@@ -308,18 +317,17 @@ class Ansatz:
         self,
     )-> None:
         
-        global _check_ansatz_format_error_info
-        
-        ansatz_param_num = _check_ansatz_format(
+        ansatz_param_num = self._check_ansatz_format(
             expression = self._expression,
             variables = self._variables,
             functions = self._functions,
+            constant_whitelist = self._constant_whitelist,
         )
         
-        if not ansatz_param_num:
+        if ansatz_param_num < 0:
             
             raise RuntimeError(
-                translate("拟设格式有误：%s") % (_check_ansatz_format_error_info)
+                translate("拟设格式有误：%s") % (self._check_ansatz_format_error_info)
             )
             
         self._param_num = ansatz_param_num
@@ -341,8 +349,9 @@ class Ansatz:
             expression = standard_expression,
             variables = self._variables,
             functions = self._functions,
+            constant_whitelist = self._constant_whitelist,
         )
-        
+    
         
     def _to_expression(
         self,
@@ -491,185 +500,183 @@ class Ansatz:
         return best_params, best_output
 
 
-_check_ansatz_format_error_info_lock = Lock() 
-
-_check_ansatz_format_error_info = ""
-    
-def _check_ansatz_format(
-    expression: str,
-    variables: List[str],
-    functions: List[str],
-)-> int:
-    
-    """
-    检查输入的表达式是否符合预定义的拟设（ansatz）格式要求。
-
-    本函数会：
-    - 校验表达式中使用的运算符、变量、函数是否符合预定义要求；
-    - 确保变量名、函数名、参数名称等符号合法，并且符合语法要求；
-    - 校验表达式中的参数是否按规定编号且连续，不允许存在常数。
-
-    参数：
-        expression (str): 被检查的数学表达式字符串。
-        variables (list[str]): 允许使用的变量名列表，表达式中的变量必须严格来自该列表。
-        functions (list[str]): 允许使用的函数名列表，函数名必须为裸函数名，不带模块前缀。
-
-    返回值：
-        int: 
-            - 如果表达式合法，返回最大参数编号（即 'paramN' 的 N 值）。
-            - 如果表达式不合法，返回 0。
-
-    注意：
-        本函数会首先对 `variables` 和 `functions` 中的内容进行合法性校验，若包含非法名称（如带模块前缀的函数名），
-        将设置错误信息并返回0。
-    """
-    
-    global _check_ansatz_format_error_info
-    
-    identifier_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-    for name in variables + functions:
+    def _check_ansatz_format(
+        self,
+        expression: str,
+        variables: List[str],
+        functions: List[str],
+        constant_whitelist: List[str],
+    )-> int:
         
-        if not identifier_pattern.fullmatch(name):
-            
-            with _check_ansatz_format_error_info_lock:
-                
-                _check_ansatz_format_error_info = \
-                    translate(
-                        "非法标识符名：'%s'，应仅由字母、数字、下划线组成，"
-                        "不能包含点号等其它字符，且应以字母或下划线开头"
-                    ) % (name)
-                    
-            return 0
+        """
+        检查输入的表达式是否符合预定义的拟设（ansatz）格式要求。
 
-    if re.search(r"[^\w\s+\-*/(),]", expression):
-        
-        with _check_ansatz_format_error_info_lock:
-                
-            _check_ansatz_format_error_info = \
-                translate(
-                    "表达式中含有非法字符"
-                )
-        
-        return 0
+        本函数会：
+        - 校验表达式中使用的运算符、变量、函数是否符合预定义要求；
+        - 确保变量名、函数名、参数名称等符号合法，并且符合语法要求；
+        - 校验表达式中的参数是否按规定编号且连续，不允许存在常数。
 
-    try:
-        tree = ast.parse(
-            source = expression, 
-            mode = "eval",
+        参数：
+            expression (str): 被检查的数学表达式字符串。
+            variables (list[str]): 允许使用的变量名列表，表达式中的变量必须严格来自该列表。
+            functions (list[str]): 允许使用的函数名列表，函数名必须为裸函数名，不带模块前缀。
+
+        返回值：
+            int: 
+                - 如果表达式合法，返回最大参数编号（即 'paramN' 的 N 值）。
+                - 如果表达式不合法，返回 0。
+
+        注意：
+            本函数会首先对 `variables` 和 `functions` 中的内容进行合法性校验，若包含非法名称（如带模块前缀的函数名），
+            将设置错误信息并返回0。
+        """
+        
+        identifier_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+        number_pattern = re.compile(r"^[+-]?("
+            r"(0|[1-9][0-9]*)|"
+            r"([0-9]*\.[0-9]+|[0-9]+\.?)([eE][+-]?[0-9]+)?|"
+            r"0[xX][0-9a-fA-F]+|"
+            r"0[oO][0-7]+|"
+            r"0[bB][01]+"
+            r")$"
         )
-        
-    except Exception:
-        
-        with _check_ansatz_format_error_info_lock:
+
+        for name in variables + functions:
+            if not identifier_pattern.fullmatch(name):
+                with self._check_ansatz_format_error_info_lock:
+                    self._check_ansatz_format_error_info = \
+                        translate(
+                            "非法标识符名：'%s'，应仅由字母、数字、下划线组成，"
+                            "不能包含点号等其它字符，且应以字母或下划线开头"
+                        ) % (name)
+                return -1
+            
+        constant_number_whitelist = []
+        constant_identifier_whitelist = []
+        for name in constant_whitelist:
+            if identifier_pattern.fullmatch(name):
+                constant_identifier_whitelist.append(name)
+            elif number_pattern.fullmatch(name):
+                constant_number_whitelist.append(name)
+            else:
+                with self._check_ansatz_format_error_info_lock:
+                    self._check_ansatz_format_error_info = \
+                        translate(
+                            "非法常量名：'%s'，常量应为标识符或数字。"
+                        ) % (name)
+                return -1
+
+        if re.search(r"[^\w\s+\-*/(),.]", expression):
+            with self._check_ansatz_format_error_info_lock:
+                self._check_ansatz_format_error_info = \
+                    translate(
+                        "表达式中含有非法字符"
+                    )
+            return -1
+
+        try:
+            tree = ast.parse(
+                source = expression, 
+                mode = "eval",
+            )
+        except Exception:
+            with self._check_ansatz_format_error_info_lock: 
+                self._check_ansatz_format_error_info = \
+                    translate(
+                        "表达式未成功解析"
+                    )
+            return -1
+
+        used_names = set()
+        used_funcs = set()
+
+        param_indices = set()
+
+        def visit(node):
+            
+            if isinstance(node, ast.BinOp) or isinstance(node, ast.UnaryOp):
                 
-            _check_ansatz_format_error_info = \
-                translate(
-                    "表达式未成功解析"
+                allowed_binops = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)
+                allowed_unops = (ast.UAdd, ast.USub)
+                
+                if isinstance(node, ast.BinOp):
+                    if not isinstance(node.op, allowed_binops):
+                        raise ValueError(translate("不支持的二元运算符"))
+                    
+                if isinstance(node, ast.UnaryOp):
+                    if not isinstance(node.op, allowed_unops):
+                        raise ValueError(translate("不支持的一元运算符"))
+                    
+                visit(node.operand if isinstance(node, ast.UnaryOp) else node.left)
+                
+                if isinstance(node, ast.BinOp):
+                    visit(node.right)
+                    
+            elif isinstance(node, ast.Call):
+                
+                if not isinstance(node.func, ast.Name):
+                    raise ValueError(translate("函数调用形式非法"))
+                
+                func_name = node.func.id
+                if func_name not in functions:
+                    raise ValueError(translate("调用了未注册的函数 '%s'")%(func_name))
+                
+                used_funcs.add(func_name)
+                
+                for arg in node.args:
+                    visit(arg)
+                    
+            elif isinstance(node, ast.Name):
+                
+                name = node.id
+                used_names.add(name)
+                
+                if name.startswith("param"):
+                    match = re.fullmatch(r"param([1-9][0-9]*)", name)
+                    
+                    if not match:
+                        raise ValueError(translate("非法参数名称 '%s'")%(name))
+                    param_indices.add(int(match.group(1)))
+                    
+                elif name not in variables + functions + constant_identifier_whitelist:
+                    raise ValueError(translate("使用了非法常量、变量或未注册函数 '%s'")%(name))
+                
+            elif isinstance(node, ast.Constant):
+                node_string = expression[node.col_offset:node.end_col_offset].strip()
+                if node_string not in constant_number_whitelist:
+                    raise ValueError(translate("表达式中不允许使用任何白名单外常数"))
+            
+            elif isinstance(node, ast.Expr):
+                visit(node.value)
+                
+            else:
+                
+                raise ValueError(
+                    translate("表达式中包含不支持的语法节点类型：%s")
+                    %(type(node).__name__)
                 )
 
-        return 0
+        try:
+            visit(tree.body)
+            
+        except Exception as error:
+            
+            with self._check_ansatz_format_error_info_lock:
+                self._check_ansatz_format_error_info = error
+                
+            return -1
 
-    used_names = set()
-    used_funcs = set()
-
-    param_indices = set()
-
-    def visit(node):
-        
-        if isinstance(node, ast.BinOp) or isinstance(node, ast.UnaryOp):
-            
-            allowed_binops = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)
-            allowed_unops = (ast.UAdd, ast.USub)
-            
-            if isinstance(node, ast.BinOp):
-                if not isinstance(node.op, allowed_binops):
-                    raise ValueError(translate("不支持的二元运算符"))
-                
-            if isinstance(node, ast.UnaryOp):
-                if not isinstance(node.op, allowed_unops):
-                    raise ValueError(translate("不支持的一元运算符"))
-                
-            visit(node.operand if isinstance(node, ast.UnaryOp) else node.left)
-            
-            if isinstance(node, ast.BinOp):
-                visit(node.right)
-                
-        elif isinstance(node, ast.Call):
-            
-            if not isinstance(node.func, ast.Name):
-                raise ValueError(translate("函数调用形式非法"))
-            
-            func_name = node.func.id
-            if func_name not in functions:
-                raise ValueError(translate("调用了未注册的函数 '%s'")%(func_name))
-            
-            used_funcs.add(func_name)
-            
-            for arg in node.args:
-                visit(arg)
-                
-        elif isinstance(node, ast.Name):
-            
-            name = node.id
-            used_names.add(name)
-            
-            if name.startswith("param"):
-                match = re.fullmatch(r"param([1-9][0-9]*)", name)
-                
-                if not match:
-                    raise ValueError(translate("非法参数名称 '%s'")%(name))
-                param_indices.add(int(match.group(1)))
-                
-            elif name not in variables and name not in functions:
-                raise ValueError(translate("使用了非法变量或未注册函数 '%s'")%(name))
-            
-        elif isinstance(node, ast.Constant):
-            raise ValueError(translate("表达式中不允许使用任何常数"))
-        
-        elif isinstance(node, ast.Expr):
-            visit(node.value)
-            
+        if param_indices:
+            max_index = max(param_indices)
+            if sorted(param_indices) != list(range(1, max_index + 1)):
+                with self._check_ansatz_format_error_info_lock:
+                    self._check_ansatz_format_error_info = translate(
+                        "参数编号跳号！"
+                    )  
+                return -1
+            return max_index
         else:
-            
-            raise ValueError(
-                translate("表达式中包含不支持的语法节点类型：%s")
-                %(type(node).__name__)
-            )
-
-    try:
-        visit(tree.body)
-        
-    except Exception as error:
-        
-        with _check_ansatz_format_error_info_lock:
-            _check_ansatz_format_error_info = error
-            
-        return 0
-
-    if param_indices:
-        
-        max_index = max(param_indices)
-        
-        if sorted(param_indices) != list(range(1, max_index + 1)):
-            
-            with _check_ansatz_format_error_info_lock:
-                _check_ansatz_format_error_info = translate(
-                    "参数编号跳号！"
-                )
-                
             return 0
-        
-        return max_index
-    
-    else:
-        
-        with _check_ansatz_format_error_info_lock:
-            _check_ansatz_format_error_info = translate(
-                msg = "表达式中未含参数！",
-            )
-            
-        return 0
     
     
 def _get_standard_order_expression(
