@@ -1,16 +1,7 @@
 from __future__ import annotations
-import re
-import ast
-import astor
-import random
-from typing import List
-from typing import Tuple
-from typing import Callable
-from threading import Lock
-from scipy.optimize import minimize
-from scipy.optimize import differential_evolution
 from ..i18n import translate
 from ..typing import *
+from ..external import *
 
 
 __all__ = [
