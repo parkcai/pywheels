@@ -34,7 +34,9 @@ def _get_answer_online_raw(
         messages.append(
             {"role": "system", "content": system_prompt}
         )
-    messages.append({"role": "user", "content": prompt})
+    messages.append(
+        {"role": "user", "content": prompt}
+    )
     
     optional_params = {}
     if temperature is not None: optional_params["temperature"] = temperature
@@ -45,7 +47,6 @@ def _get_answer_online_raw(
     response = client.chat.completions.create(
         model = model,
         messages = messages,
-        temperature = temperature,
         stream = False,
         **optional_params,
     )
@@ -162,9 +163,9 @@ class ModelManager:
                 continue
             
         raise RuntimeError(
-            translate("所有")
+            translate("[get_answer 报错] 所有尝试均失败！")
         )
-      
+    
     # ----------------------------- 内部动作 ----------------------------- 
   
     def _get_online_model_instance(
