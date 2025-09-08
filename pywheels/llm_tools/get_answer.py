@@ -19,6 +19,7 @@ def _get_answer_online_raw(
     images: List[Any],
     temperature: Optional[float],
     top_p: Optional[float],
+    max_completion_tokens: Optional[int],
     timeout: Optional[float],
 )-> str:
 
@@ -38,6 +39,7 @@ def _get_answer_online_raw(
     optional_params = {}
     if temperature is not None: optional_params["temperature"] = temperature
     if top_p is not None: optional_params["top_p"] = top_p
+    if max_completion_tokens is not None: optional_params["max_completion_tokens"] = max_completion_tokens
     if timeout is not None: optional_params["timeout"] = timeout
         
     response = client.chat.completions.create(
@@ -113,6 +115,7 @@ class ModelManager:
         images: List[Any] = [],
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
+        max_completion_tokens: Optional[int] = None,
         timeout: Optional[int] = None,
         trial_num: int = 1,
         trial_interval: int = 5,
@@ -138,6 +141,7 @@ class ModelManager:
                     images = images,
                     temperature = temperature,
                     top_p = top_p,
+                    max_completion_tokens = max_completion_tokens,
                     timeout = timeout,
                 )
                 if not check_and_accept(response):
@@ -200,6 +204,7 @@ def get_answer(
     images: List[Any] = [],
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
+    max_completion_tokens: Optional[int] = None,
     timeout: Optional[int] = None,
     trial_num: int = 1,
     trial_interval: int = 5,
@@ -213,6 +218,7 @@ def get_answer(
         images = images,
         temperature = temperature,
         top_p = top_p,
+        max_completion_tokens = max_completion_tokens,
         timeout = timeout,
         trial_num = trial_num,
         trial_interval = trial_interval,
