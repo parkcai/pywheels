@@ -3,6 +3,7 @@ import re
 import ast
 import astor
 import json
+import base64
 import random
 from time import sleep
 from threading import Lock
@@ -18,6 +19,7 @@ __all__ = [
     "re",
     "ast",
     "astor",
+    "base64",
     "random",
     "json",
     "Lock",
