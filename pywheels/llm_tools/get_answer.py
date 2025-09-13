@@ -109,7 +109,9 @@ def _get_answer_online_raw(
         if i == len(seperated_texts) - 1: break
         content.append({
             "type": "image_url",
-            "image_url": _convert_image_to_url(images[i]),
+            "image_url": {
+                "url": _convert_image_to_url(images[i]),
+            },
         })
     messages.append({
         "role": "user", 
