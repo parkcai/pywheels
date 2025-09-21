@@ -85,12 +85,14 @@ def _get_answer_online_raw(
                 "prompt 含有 %d 个图片占位符，但提供了 %d 张图片！"
             ) % (prompt.count(image_placeholder), len(images))
         )
-
-    if base_url:
-        client = OpenAI(api_key=api_key, base_url=base_url)
         
-    else:
-        client = OpenAI(api_key=api_key)
+    client_optional_params = {}
+    if base_url != "": client_optional_params["base_url"] = base_url
+    if timeout is not None: client_optional_params["timeout"] = timeout
+    client = OpenAI(
+        api_key = api_key,
+        **client_optional_params,
+    )
         
     messages = []
     if system_prompt is not None:
@@ -122,7 +124,6 @@ def _get_answer_online_raw(
     if temperature is not None: optional_params["temperature"] = temperature
     if top_p is not None: optional_params["top_p"] = top_p
     if max_completion_tokens is not None: optional_params["max_completion_tokens"] = max_completion_tokens
-    if timeout is not None: optional_params["timeout"] = timeout
         
     response = client.chat.completions.create(
         model = model,
