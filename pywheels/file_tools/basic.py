@@ -1,10 +1,6 @@
-import os
-import shutil
-import tempfile
-from threading import Lock
-from typing import Optional
 from ..i18n import translate
 from ..typing import *
+from ..external import *
 
 
 __all__ = [
@@ -15,7 +11,7 @@ __all__ = [
     "delete_file",
     "copy_file",
     "clear_file",
-    "get_files",
+    "get_file_paths",
     "get_lines",
 ]
 
@@ -100,48 +96,26 @@ def get_temp_file_path(
     suffix: Optional[str] = "",
     prefix: str = "tmp_",
     directory: Optional[str] = None,
-) -> str:
-    
-    """
-    在线程安全的环境中生成一个临时文件路径或临时目录。
-
-    本函数会：
-      - 如果 suffix 为 None，则创建一个临时目录并返回其路径；
-      - 否则，在线程锁保护下生成一个唯一的临时文件路径（不创建文件）。
-
-    Args:
-        suffix (str or None): 文件后缀名；若为 None，则表示创建临时目录。
-        prefix (str): 文件或目录前缀，默认 "tmp_"。
-        directory (str): 保存路径，默认使用临时目录。
-
-    Returns:
-        str: 生成的临时文件路径或临时目录路径。
-    """
+)-> str:
 
     global tempfile_lock
     
     with tempfile_lock:
-        
         if suffix is None:
-            
             tmp_dir_path = tempfile.mkdtemp(
                 prefix = prefix,
                 dir = directory,
             )
-            
             return tmp_dir_path
-        
         else:
-            
             temp_file_path = tempfile.mktemp(
                 suffix = suffix,
                 prefix = prefix,
                 dir = directory,
             )
-            
             return temp_file_path
-        
-        
+ 
+
 def delete_file(
     file_path: str
 ) -> None:
@@ -180,153 +154,95 @@ def delete_file(
             
             
 def copy_file(
-    source_file_path: str,
-    destination_file_path: str,
-) -> None:
-    
-    """
-    Copy file or folder from source_file_path to destination_file_path.
+    source_path: str,
+    destination_path: str,
+)-> None:
 
-    Automatically determines:
-      - If source_file_path is a file, copies it as destination_file_path;
-      - If source_file_path is a directory:
-          - If destination_file_path doesn't exist, recursively copies the entire directory;
-          - If destination_file_path exists, copies directory contents inside destination_file_path.
-      - Automatically creates parent directories of destination_file_path (if they don't exist)
-
-    Args:
-        source_file_path (str): Source path, can be file or directory.
-        destination_file_path (str): Destination path.
-    """
-    
-    if not os.path.exists(source_file_path):
-        
+    if not os.path.exists(source_path):
         raise FileNotFoundError(
-            translate("源路径不存在: %s") % (source_file_path)
+            translate(
+                "[copy_file 报错] 源路径不存在: %s"
+            ) % (source_path)
         )
     
-    # Create parent directories of destination_file_path (whether file or directory target)
-    os.makedirs(os.path.dirname(destination_file_path), exist_ok=True)
+    destination_parent_directory = os.path.dirname(destination_path)
+    if destination_parent_directory:
+        os.makedirs(destination_parent_directory, exist_ok=True)
 
-    if os.path.isfile(source_file_path):
-        shutil.copy2(source_file_path, destination_file_path)
-        
-    elif os.path.isdir(source_file_path):
-        
-        if not os.path.exists(destination_file_path):
-            shutil.copytree(source_file_path, destination_file_path)
-            
-        else:
-            
-            for item in os.listdir(source_file_path):
-                
-                s_item = os.path.join(source_file_path, item)
-                d_item = os.path.join(destination_file_path, item)
-                
-                if os.path.isdir(s_item):
-                    shutil.copytree(s_item, d_item, dirs_exist_ok=True)
-                    
-                else:
-                    shutil.copy2(s_item, d_item)
-                    
+    if os.path.isfile(source_path):
+        shutil.copy2(source_path, destination_path)
+    elif os.path.isdir(source_path):
+        shutil.copytree(source_path, destination_path, dirs_exist_ok=True)
     else:
-        
         raise ValueError(
-            translate("不支持的源路径类型: %s") % (source_file_path)
+            translate(
+                "[copy_file 报错] 不支持的源路径类型: %s"
+            ) % (source_path)
         )
-        
+
         
 def clear_file(
     file_path: str,
     encoding: str = "UTF-16",
 ):
-    
-    """
-    清空指定文件的全部内容。
-    
-    若文件不存在，则调用 guarantee_file_exist 创建空白文件。
 
-    参数:
-        file_path (str): 目标文件的路径。
-        encoding (str): 编码方式，默认为 UTF-16。
-    """
-    
     try:
-        
         with open(
             file = file_path, 
             mode = "w", 
             encoding = encoding,
         ):
             pass
-        
     except FileNotFoundError:
         guarantee_file_exist(file_path)
         
         
-def get_files(
+def get_file_paths(
     directory: str,
     file_type: Literal["all", "files_only", "dirs_only"] = "all",
-    start_with: str = "",
-    end_with: str = "",
-    behaviour: Literal["return_basenames", "return_full_paths"] = "return_basenames",
+    starting_with: str = "",
+    ending_with: str = "",
+    return_format: Literal["name_only", "full_path"] = "name_only",
+    sort_key: Callable[[str], float] = lambda _: 0.0,
+    sort_reverse: bool = False,
 )-> List[str]:
     
-    """
-    获取指定目录下文件的basename列表
-    
-    Args:
-        directory: 目录路径
-        file_type: 文件类型筛选选项
-            - "all": 返回所有文件和目录
-            - "dirs_only": 只返回目录
-            - "files_only": 只返回文件（非目录）
-    
-    Returns:
-        文件basename的列表
-    """
-    
     if not os.path.exists(directory):
-        
         raise ValueError(
-            translate("目录 %s 不存在")
+            translate("[get_file_paths 报错] 目录 %s 不存在")
             % (directory)
         )
     
     if not os.path.isdir(directory):
-        
         raise ValueError(
-            translate("路径 %s 不是目录")
+            translate("[get_file_paths 报错] 路径 %s 不是目录")
             % (directory)
         )
     
     result = []
-    
     for item in os.listdir(directory):
-        
         item_path = os.path.join(directory, item)
-        
-        if not (item.startswith(start_with) and item.endswith(end_with)):
-            continue
-        
+        if not (item.startswith(starting_with) and item.endswith(ending_with)): continue
         if file_type == "all":
             result.append(item)
-            
         elif file_type == "dirs_only" and os.path.isdir(item_path):
             result.append(item)
-            
         elif file_type == "files_only" and os.path.isfile(item_path):
             result.append(item)
             
-    if behaviour == "return_basenames":
+    result.sort(key=sort_key, reverse=sort_reverse)
+            
+    if return_format == "name_only":
         return result
-    
-    elif behaviour == "return_full_paths":
-        return [f"{directory}/{basename}" for basename in result]
-    
+    elif return_format == "full_path":
+        result = [f"{directory}/{name}" for name in result]
+        return result
     else:
-        
-        raise NotImplementedError
+        raise ValueError(
+            translate(
+                "[get_file_paths 出错] 未知的 return_format 取值：%s！"
+            ) % (return_format)
+        )
 
 
 def get_lines(
