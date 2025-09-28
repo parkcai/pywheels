@@ -28,14 +28,20 @@ class UIDGenerator:
     )-> str:
         
         with self._lock:
-            
             while True:
-                
                 trial_uid: str = self._get_trial_uid(uid_length)
-                
                 if trial_uid not in self._recorded_uids:
                     self._recorded_uids.add(trial_uid)
                     return trial_uid
+                
+                
+    def update_existing_uids(
+        self,
+        existing_uids: Set[str],
+    )-> None:
+        
+        with self._lock:
+            self._recorded_uids.update(existing_uids)
             
 
     def _get_trial_uid(
@@ -47,5 +53,4 @@ class UIDGenerator:
             population = ascii_lowercase, 
             k = uid_length,
         ))
-        
         return trial_uid
