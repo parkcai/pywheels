@@ -156,12 +156,12 @@ def execute_python_script(
     return result_info
 
 
-TaskIndexerType = TypeVar("TaskIndexerType")
-TaskOutputType = TypeVar("TaskOutputType")
+_TaskIndexerType = TypeVar("_TaskIndexerType")
+_TaskOutputType = TypeVar("_TaskOutputType")
 
 def run_tasks_concurrently(
-    task: Callable[..., TaskOutputType],
-    task_indexers: List[TaskIndexerType],
+    task: Callable[..., _TaskOutputType],
+    task_indexers: List[_TaskIndexerType],
     task_inputs: List[Tuple[Any, ...]],
     method: Literal["ThreadPoolExecutor", "ProcessPoolExecutor"] = "ThreadPoolExecutor",
     max_workers: Optional[int] = None,
@@ -169,7 +169,7 @@ def run_tasks_concurrently(
     progress_bar_description: Optional[str] = None,
     local_storage_path: str = "",
     checkpoint_threshold: int = 10,
-)-> Dict[TaskIndexerType, TaskOutputType]:
+)-> Dict[_TaskIndexerType, _TaskOutputType]:
 
     if len(task_indexers) != len(task_inputs):
         raise ValueError(
@@ -185,7 +185,7 @@ def run_tasks_concurrently(
         "ProcessPoolExecutor": ProcessPoolExecutor,
     }[method]
     
-    results: Dict[TaskIndexerType, TaskOutputType] = {}
+    results: Dict[_TaskIndexerType, _TaskOutputType] = {}
     if local_storage_path:
         guarantee_file_exist(file_path=local_storage_path)
         try:
@@ -204,7 +204,7 @@ def run_tasks_concurrently(
         max_workers = max_workers
     ) as executor:
 
-        future_to_indexer: Dict[Any, TaskIndexerType] = {}
+        future_to_indexer: Dict[Any, _TaskIndexerType] = {}
         
         for indexer, input_data in zip(task_indexers, task_inputs):
             if indexer in results: continue
