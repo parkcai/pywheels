@@ -1,5 +1,6 @@
 import sys
 import shlex
+import pickle
 import subprocess
 from tqdm import tqdm
 from concurrent.futures import as_completed
@@ -8,6 +9,7 @@ from concurrent.futures import ProcessPoolExecutor
 from ..i18n import translate
 from ..file_tools import delete_file
 from ..file_tools import get_temp_file_path
+from ..file_tools import guarantee_file_exist
 from ..typing import *
 
 
@@ -165,47 +167,11 @@ def run_tasks_concurrently(
     max_workers: Optional[int] = None,
     show_progress_bar: bool = True,
     progress_bar_description: Optional[str] = None,
+    local_storage_path: str = "",
+    checkpoint_threshold: int = 10,
 )-> Dict[TaskIndexerType, TaskOutputType]:
-    
-    """
-    Execute multiple tasks concurrently using thread or process pool, returning indexed results.
-
-    This function will:
-      - Validate input parameters for consistency and correctness
-      - Create appropriate executor (thread or process pool)
-      - Submit all tasks to the executor with proper indexing
-      - Display progress bar to monitor execution (optional)
-      - Collect and map results to their respective indexers
-      - Handle exceptions and provide meaningful error information
-
-    Args:
-        task: Python callable to execute for each input (accepts variable arguments, returns output)
-        task_indexers: List of unique identifiers for each task (e.g., IDs, names, or keys)
-        task_inputs: List of input argument tuples, each will be unpacked and passed to the task function
-        method: Execution method, either "ThreadPoolExecutor" (default) or "ProcessPoolExecutor"
-        max_workers: Maximum number of concurrent workers. None uses default (CPU count for processes)
-        show_progress_bar: Whether to display a progress bar during execution. Default True.
-        progress_bar_description: Custom description for the progress bar. Default None.
-
-    Returns:
-        Dict[TaskIndexerType, TaskOutputType]: Dictionary mapping each task indexer to its output result
-
-    Raises:
-        ValueError: When task_indexers and task_inputs have different lengths
-        RuntimeError: When any task execution fails with an exception
-
-    Example:
-        >>> def process_data(name: str, value: int, multiplier: float) -> float:
-        ...     return value * multiplier
-        >>> indexers = ["task1", "task2", "task3"]
-        >>> inputs = [("item1", 10, 1.5), ("item2", 20, 2.0), ("item3", 30, 0.5)]
-        >>> results = run_tasks_concurrently(process_data, indexers, inputs, show_progress_bar=True)
-        >>> print(results)
-        {"task1": 15.0, "task2": 40.0, "task3": 15.0}
-    """
 
     if len(task_indexers) != len(task_inputs):
-        
         raise ValueError(
             translate(
                 "task_indexers and task_inputs must have the same length. Got %d indexers and %d inputs."
@@ -220,7 +186,20 @@ def run_tasks_concurrently(
     }[method]
     
     results: Dict[TaskIndexerType, TaskOutputType] = {}
-    
+    if local_storage_path:
+        guarantee_file_exist(file_path=local_storage_path)
+        try:
+            with open(file=local_storage_path, mode="rb") as file_pointer:
+                cached_results = pickle.load(file_pointer)
+            results.update(cached_results)
+        except (FileNotFoundError, EOFError):
+            pass
+        
+    def _save_cache():
+        if not local_storage_path: return
+        with open(file=local_storage_path, mode="wb") as file_pointer:
+            pickle.dump(results, file_pointer)
+
     with executor_class(
         max_workers = max_workers
     ) as executor:
@@ -228,33 +207,32 @@ def run_tasks_concurrently(
         future_to_indexer: Dict[Any, TaskIndexerType] = {}
         
         for indexer, input_data in zip(task_indexers, task_inputs):
-            
+            if indexer in results: continue
             future = executor.submit(task, *input_data)
             future_to_indexer[future] = indexer
             
         future_iterator = as_completed(future_to_indexer)
         
         if show_progress_bar:
-            
             future_iterator = tqdm(
                 iterable = future_iterator,
                 total = len(task_indexers),
                 desc = progress_bar_description,
             )
-
+        tick = 0
         for future in future_iterator:
-            
             indexer = future_to_indexer[future]
-            
             try:
                 results[indexer] = future.result()
-                
+                tick += 1
+                if tick % checkpoint_threshold == 0:
+                    _save_cache()
             except Exception as error:
-
                 raise RuntimeError(
                     translate(
                         "Task failed for indexer '%s': %s"
                     ) % (str(indexer), str(error))
                 ) from error
     
+    _save_cache()
     return results
