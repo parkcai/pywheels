@@ -8,6 +8,7 @@ import base64
 import random
 import tempfile
 from time import sleep
+from copy import deepcopy
 from threading import Lock
 from openai import OpenAI
 from threading import Lock
@@ -24,6 +25,7 @@ __all__ = [
     "shutil",
     "base64",
     "random",
+    "deepcopy",
     "tempfile",
     "json",
     "Lock",

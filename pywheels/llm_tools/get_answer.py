@@ -7,6 +7,7 @@ __all__ = [
     "ModelManager",
     "load_api_keys",
     "get_answer",
+    "get_available_models",
 ]
 
 
@@ -254,6 +255,14 @@ class ModelManager:
                 "[get_answer 报错] 所有尝试均失败！最后一次尝试的失败原因：%s"
             ) % (last_error)
         )
+        
+        
+    def get_available_models(
+        self,
+    )-> List[str]:
+        
+        with self._online_models_lock:
+            return [str(model) for model in self._online_models]
     
     # ----------------------------- 内部动作 ----------------------------- 
   
@@ -318,6 +327,12 @@ def get_answer(
     )
     
     return response
+
+
+def get_available_models(
+)-> List[str]:
+    
+    return model_manager.get_available_models()
 
 
 default_api_keys_path = "api_keys.json"
