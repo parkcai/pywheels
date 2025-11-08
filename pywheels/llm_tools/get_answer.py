@@ -34,7 +34,10 @@ def _convert_image_to_url(
         (image.startswith("http://") or image.startswith("https://")):
         image_type = "url"
     elif isinstance(image, str):
-        image_type = "file"
+        if os.path.exists(image) and os.path.isfile(image):
+            image_type = "file"
+        else:
+            image_type = "base64"
     elif isinstance(image, bytes):
         image_type = "bytes"
     else:
@@ -57,6 +60,12 @@ def _convert_image_to_url(
         base64_data = base64.b64encode(image_bytes).decode("UTF-8") 
         file_type = _get_file_type_of_image_bytes(image_bytes)
         return f"data:image/{file_type};base64,{base64_data}"
+    elif image_type == "base64":
+        assert isinstance(image, str)
+        image_bytes = base64.b64decode(image)
+        base64_data = base64.b64encode(image_bytes).decode("UTF-8")
+        file_type = _get_file_type_of_image_bytes(image_bytes)
+        return f"data:image/{file_type};base64,{base64_data}"
     else:
         assert image_type == "bytes"
         assert isinstance(image, bytes)
@@ -66,8 +75,8 @@ def _convert_image_to_url(
         return f"data:image/{file_type};base64,{base64_data}"
 
 
-def _get_answer_online_raw(
-    prompt: str,
+def _get_answer_raw(
+    prompt: Union[str, List[str]],
     model: str,
     api_key: str,
     base_url: str,
@@ -80,13 +89,33 @@ def _get_answer_online_raw(
     timeout: Optional[float],
 )-> str:
     
-    if prompt.count(image_placeholder) != len(images):
+    if isinstance(prompt, str):
+        prompt_list = [prompt]
+    elif isinstance(prompt, list):
+        prompt_list = prompt
+    else:
         raise ValueError(
             translate(
-                "prompt 含有 %d 个图片占位符，但提供了 %d 张图片！"
-            ) % (prompt.count(image_placeholder), len(images))
+                "prompt 应为 str 或 list，不应为 %s ！"
+            ) % (str(type(prompt)))
         )
-        
+
+    if len(prompt_list) > 1:
+        assert len(prompt_list) % 2 == 1, \
+            translate(
+                "多轮对话的 prompt 列表长度必须是奇数（表示用户 - 助手 - ... - 助手 - 用户）"
+            )
+
+    image_placeholder_count = 0
+    for text in prompt_list:
+        image_placeholder_count += text.count(image_placeholder)
+    if image_placeholder_count != len(images):
+        raise ValueError(
+            translate(
+                "prompt 列表共含有 %d 个图片占位符，但提供了 %d 张图片！"
+            ) % (image_placeholder_count, len(images))
+        )
+    
     client_optional_params = {}
     if base_url != "": client_optional_params["base_url"] = base_url
     if timeout is not None: client_optional_params["timeout"] = timeout
@@ -94,7 +123,7 @@ def _get_answer_online_raw(
         api_key = api_key,
         **client_optional_params,
     )
-        
+    
     messages = []
     if system_prompt is not None:
         messages.append({
@@ -102,24 +131,43 @@ def _get_answer_online_raw(
             "content": system_prompt
         })
     
-    content = []
-    seperated_texts = prompt.split(image_placeholder)
-    for i in range(len(seperated_texts)):
-        content.append({
-            "type": "text",
-            "text": seperated_texts[i],
-        })
-        if i == len(seperated_texts) - 1: break
-        content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": _convert_image_to_url(images[i]),
-            },
-        })
-    messages.append({
-        "role": "user", 
-        "content": content,
-    })
+    image_index = 0
+    for i, text in enumerate(prompt_list):
+        role = "user" if i % 2 == 0 else "assistant"
+        current_image_placeholder_count = text.count(image_placeholder)
+        if role == "assistant" and current_image_placeholder_count > 0:
+            raise ValueError(
+                translate(
+                    "历史消息中, 角色为 'assistant' (助手) 的消息 (索引 %d) "
+                    "不允许包含图片占位符！"
+                ) % i
+            )
+        if current_image_placeholder_count == 0:
+            messages.append({
+                "role": role,
+                "content": text,
+            })
+        else:
+            content = []
+            seperated_texts = text.split(image_placeholder)
+            for j in range(len(seperated_texts)):
+                content.append({
+                    "type": "text",
+                    "text": seperated_texts[j],
+                })
+                if j == len(seperated_texts) - 1: break
+                current_image = images[image_index]
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": _convert_image_to_url(current_image),
+                    },
+                })
+                image_index += 1
+            messages.append({
+                "role": "user", 
+                "content": content,
+            })
     
     optional_params = {}
     if temperature is not None: optional_params["temperature"] = temperature
@@ -188,11 +236,11 @@ class ModelManager:
                     ],
                     "next_choice_index": 0,
                 }
-        
-        
+      
+      
     def get_answer(
         self,
-        prompt: str,
+        prompt: Union[str, List[str]],
         model: str,
         system_prompt: Optional[str] = None,
         images: List[Any] = [],
@@ -216,7 +264,7 @@ class ModelManager:
         last_error = None
         for trial in range(trial_num):
             try:
-                response = _get_answer_online_raw(
+                response = _get_answer_raw(
                     prompt = prompt,
                     model = model,
                     api_key = api_key,
@@ -297,7 +345,7 @@ def load_api_keys(
      
         
 def get_answer(
-    prompt: str,
+    prompt: Union[str, List[str]],
     model: str,
     system_prompt: Optional[str] = None,
     images: List[Any] = [],
