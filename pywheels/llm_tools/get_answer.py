@@ -43,7 +43,7 @@ def _convert_image_to_url(
     else:
         raise NotImplementedError(
             translate(
-                "[get_answer 报错] 暂时无法处理类型为 %s 的图片！"
+                "暂时无法处理类型为 %s 的图片！"
             ) % (type(image).__name__)
         )
         
@@ -99,9 +99,9 @@ def _get_answer_raw(
         raise ValueError(
             translate(
                 "prompt 应为 str 或 list，不应为 %s ！"
-            ) % (str(type(prompt)))
+            ) % (type(prompt).__name__)
         )
-
+    
     if len(prompt_list) > 1:
         assert len(prompt_list) % 2 == 1, \
             translate(
@@ -242,8 +242,8 @@ def _get_answer_raw(
                 if function_name not in tool_registry:
                     raise NameError(
                         translate(
-                            "[get_answer 报错] 'tool_registry' 中未找到名为 '%s' 的工具！"
-                        ) % function_name
+                            "'tool_registry' 中未找到名为 '%s' 的工具！"
+                        ) % (function_name)
                     )
                 function_to_call = tool_registry[function_name]
                 try:
