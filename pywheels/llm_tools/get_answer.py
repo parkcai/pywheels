@@ -88,6 +88,7 @@ def _get_answer_raw(
     max_completion_tokens: Optional[int],
     timeout: Optional[float],
     tools: List[Dict[str, Any]],
+    tool_use_trial_num: int,
 )-> str:
 
     if isinstance(prompt, str):
@@ -217,8 +218,7 @@ def _get_answer_raw(
         api_tool_params["tools"] = openai_tools_schema
         api_tool_params["tool_choice"] = "auto"
 
-    max_tool_calls = 10
-    for _ in range(max_tool_calls):
+    for _ in range(tool_use_trial_num):
         response = client.chat.completions.create(
             model = model,
             messages = messages,
@@ -275,11 +275,10 @@ def _get_answer_raw(
                 ) % (finish_reason)
             )
 
-    # 如果循环次数超过 max_tool_calls
     raise RuntimeError(
         translate(
             "超过最大工具调用次数 (%d)！"
-        ) % (max_tool_calls)
+        ) % (tool_use_trial_num)
     )
 
 
@@ -345,6 +344,7 @@ class ModelManager:
         trial_interval: int = 5,
         check_and_accept: Callable[[str], bool] = lambda _: True,
         tools: List[Dict[str, Any]] = [],
+        tool_use_trial_num: int = 10,
     )-> str:
         
         if not self._is_online_model[model]:
@@ -370,6 +370,7 @@ class ModelManager:
                     max_completion_tokens = max_completion_tokens,
                     timeout = timeout,
                     tools = tools,
+                    tool_use_trial_num = tool_use_trial_num,
                 )
                 if not check_and_accept(response):
                     last_error = translate(
@@ -452,8 +453,9 @@ def get_answer(
     trial_interval: int = 5,
     check_and_accept: Callable[[str], bool] = lambda _: True,
     tools: List[Dict[str, Any]] = [],
+    tool_use_trial_num: int = 10,
 )-> str:
-        
+    
     response = model_manager.get_answer(
         prompt = prompt,
         model = model,
@@ -468,6 +470,7 @@ def get_answer(
         trial_interval = trial_interval,
         check_and_accept = check_and_accept,
         tools = tools,
+        tool_use_trial_num = tool_use_trial_num,
     )
     
     return response
