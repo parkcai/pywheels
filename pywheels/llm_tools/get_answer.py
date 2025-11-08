@@ -87,8 +87,9 @@ def _get_answer_raw(
     top_p: Optional[float],
     max_completion_tokens: Optional[int],
     timeout: Optional[float],
+    tools: List[Dict[str, Any]],
 )-> str:
-    
+
     if isinstance(prompt, str):
         prompt_list = [prompt]
     elif isinstance(prompt, list):
@@ -124,7 +125,7 @@ def _get_answer_raw(
         **client_optional_params,
     )
     
-    messages = []
+    messages: List[Any] = []
     if system_prompt is not None:
         messages.append({
             "role": "system", 
@@ -169,26 +170,117 @@ def _get_answer_raw(
                 "content": content,
             })
     
+    tool_registry: Dict[str, Callable] = {}
+    openai_tools_schema: List[Dict[str, Any]] = []
+    
+    if len(tools):
+        for tool_def in tools:
+            if "implementation" not in tool_def:
+                raise ValueError(
+                    translate(
+                        "工具定义缺少 'implementation' 键！"
+                    )
+                )
+            callable_func = tool_def["implementation"]
+            if not callable(callable_func):
+                raise ValueError(
+                    translate(
+                        "工具定义中的 'implementation' 字段必须是一个 Callable！"
+                    )
+                )
+            schema_part = tool_def.copy()
+            del schema_part["implementation"]
+            function_def = schema_part.get("function")
+            if not isinstance(function_def, dict):
+                raise ValueError(
+                    translate(
+                        "工具定义 %s 缺少 'function' 字典。"
+                    ) % str(schema_part)
+                )
+            tool_name = function_def.get("name")
+            if not isinstance(tool_name, str):
+                raise ValueError(
+                    translate(
+                        "工具定义 %s 缺少 'function.name' 字符串。"
+                    ) % str(schema_part)
+                )
+            tool_registry[tool_name] = callable_func
+            openai_tools_schema.append(schema_part)
+    
     optional_params = {}
     if temperature is not None: optional_params["temperature"] = temperature
     if top_p is not None: optional_params["top_p"] = top_p
     if max_completion_tokens is not None: optional_params["max_completion_tokens"] = max_completion_tokens
-        
-    response = client.chat.completions.create(
-        model = model,
-        messages = messages,
-        stream = False,
-        **optional_params,
-    )
-        
-    if isinstance(response, str):
-        return response
-    else:
-        response_content = response.choices[0].message.content
-        if response_content is not None:
-            return response_content
+     
+    api_tool_params: Dict[str, Any] = {}
+    if openai_tools_schema:
+        api_tool_params["tools"] = openai_tools_schema
+        api_tool_params["tool_choice"] = "auto"
+
+    max_tool_calls = 10
+    for _ in range(max_tool_calls):
+        response = client.chat.completions.create(
+            model = model,
+            messages = messages,
+            stream = False,
+            **optional_params,
+            **api_tool_params,
+        )
+        if isinstance(response, str): return response
+        response_message = response.choices[0].message
+        finish_reason = response.choices[0].finish_reason
+        messages.append(response_message)
+        if finish_reason == "stop":
+            response_content = response_message.content
+            return response_content if response_content is not None else ""
+        elif finish_reason == "tool_calls":
+            assert response_message.tool_calls is not None
+            for tool_call in response_message.tool_calls:
+                assert isinstance(tool_call, ChatCompletionMessageFunctionToolCall)
+                function_name = tool_call.function.name
+                function_args_str = tool_call.function.arguments
+                if function_name not in tool_registry:
+                    raise NameError(
+                        translate(
+                            "[get_answer 报错] 'tool_registry' 中未找到名为 '%s' 的工具！"
+                        ) % function_name
+                    )
+                function_to_call = tool_registry[function_name]
+                try:
+                    function_args = json.loads(function_args_str)
+                    function_response = function_to_call(**function_args)
+                    if not isinstance(function_response, str):
+                        function_response_str = json.dumps(
+                            function_response, 
+                            ensure_ascii=False,
+                        )
+                    else:
+                        function_response_str = function_response
+                except Exception as e:
+                    function_response_str = translate(
+                        "工具 '%s' 执行失败: %s"
+                    ) % (function_name, str(e))
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": function_name,
+                    "content": function_response_str,
+                })
+            continue
+            
         else:
-            return ""
+            raise RuntimeError(
+                translate(
+                    "模型因意外原因停止: %s"
+                ) % (finish_reason)
+            )
+
+    # 如果循环次数超过 max_tool_calls
+    raise RuntimeError(
+        translate(
+            "超过最大工具调用次数 (%d)！"
+        ) % (max_tool_calls)
+    )
 
 
 class ModelManager:
@@ -199,7 +291,7 @@ class ModelManager:
         
         self._is_online_model: Dict[str, bool] = {}
         
-        self._online_models = {}
+        self._online_models: Dict[str, Any] = {} # (修改点) typing
         self._online_models_lock: Lock = Lock()
         
     # ----------------------------- 外部动作 ----------------------------- 
@@ -236,8 +328,8 @@ class ModelManager:
                     ],
                     "next_choice_index": 0,
                 }
-      
-      
+    
+    
     def get_answer(
         self,
         prompt: Union[str, List[str]],
@@ -251,7 +343,8 @@ class ModelManager:
         timeout: Optional[int] = None,
         trial_num: int = 1,
         trial_interval: int = 5,
-        check_and_accept: Callable[[str], bool] = lambda _: True 
+        check_and_accept: Callable[[str], bool] = lambda _: True,
+        tools: List[Dict[str, Any]] = [],
     )-> str:
         
         if not self._is_online_model[model]:
@@ -276,6 +369,7 @@ class ModelManager:
                     top_p = top_p,
                     max_completion_tokens = max_completion_tokens,
                     timeout = timeout,
+                    tools = tools,
                 )
                 if not check_and_accept(response):
                     last_error = translate(
@@ -313,7 +407,7 @@ class ModelManager:
             return [str(model) for model in self._online_models]
     
     # ----------------------------- 内部动作 ----------------------------- 
-  
+ 
     def _get_online_model_instance(
         self,
         model_name: str,
@@ -342,7 +436,7 @@ def load_api_keys(
     api_keys_path: str,
 )-> None:
     model_manager.load_api_keys(api_keys_path)
-     
+      
         
 def get_answer(
     prompt: Union[str, List[str]],
@@ -356,7 +450,8 @@ def get_answer(
     timeout: Optional[int] = None,
     trial_num: int = 1,
     trial_interval: int = 5,
-    check_and_accept: Callable[[str], bool] = lambda _: True 
+    check_and_accept: Callable[[str], bool] = lambda _: True,
+    tools: List[Dict[str, Any]] = [],
 )-> str:
         
     response = model_manager.get_answer(
@@ -372,6 +467,7 @@ def get_answer(
         trial_num = trial_num,
         trial_interval = trial_interval,
         check_and_accept = check_and_accept,
+        tools = tools,
     )
     
     return response

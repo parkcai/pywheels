@@ -11,6 +11,7 @@ from time import sleep
 from copy import deepcopy
 from threading import Lock
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageFunctionToolCall
 from threading import Lock
 from random import normalvariate
 from scipy.optimize import minimize
@@ -32,6 +33,7 @@ __all__ = [
     "sleep",
     "OpenAI",
     "minimize",
-    "differential_evolution",
     "normalvariate",
+    "differential_evolution",
+    "ChatCompletionMessageFunctionToolCall",
 ]
