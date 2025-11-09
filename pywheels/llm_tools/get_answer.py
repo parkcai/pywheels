@@ -73,6 +73,96 @@ def _convert_image_to_url(
         base64_data = base64.b64encode(image_bytes).decode("UTF-8")
         file_type = _get_file_type_of_image_bytes(image_bytes)
         return f"data:image/{file_type};base64,{base64_data}"
+    
+    
+def _parse_tools(
+    tools: List[Dict[str, Any]],
+)-> Tuple[List[Dict[str, Any]], Dict[str, Callable]]:
+    
+    openai_tools_schema: List[Dict[str, Any]] = []
+    tool_registry: Dict[str, Callable] = {}
+    
+    for i, tool_def in enumerate(tools):
+        if not isinstance(tool_def, dict):
+            raise TypeError(
+                translate("tools 列表中的项 (索引 %d) 必须是 dict, 而不是 %s。") 
+                % (i, type(tool_def).__name__)
+            )
+        name = tool_def.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError(
+                translate("工具定义 (索引 %d) 缺少 'name' 字段、为空或类型不是 str。") % i
+            )
+        description = tool_def.get("description")
+        if not isinstance(description, str) or not description:
+            raise ValueError(
+                translate("工具 '%s' (索引 %d) 缺少 'description' 字段、为空或类型不是 str。") 
+                % (name, i)
+            )
+        implementation = tool_def.get("implementation")
+        if not callable(implementation):
+            raise ValueError(
+                translate("工具 '%s' (索引 %d) 缺少 'implementation' 字段或其不是 Callable。") 
+                % (name, i)
+            )
+        tool_registry[name] = implementation
+        openai_function_def: Dict[str, Any] = {
+            "name": name,
+            "description": description
+        }
+        user_parameters = tool_def.get("parameters")
+        if user_parameters is None:
+            user_parameters = {}
+        if not isinstance(user_parameters, dict):
+             raise TypeError(
+                translate("工具 '%s' (索引 %d) 的 'parameters' 字段必须是 dict, 而不是 %s。") 
+                % (name, i, type(user_parameters).__name__)
+            )
+        properties: Dict[str, Any] = {}
+        required_list: List[str] = []
+        for param_name, param_details in user_parameters.items():
+            if not isinstance(param_details, dict):
+                raise TypeError(
+                    translate("工具 '%s' 的参数 '%s' 定义必须是 dict, 而不是 %s。") 
+                    % (name, param_name, type(param_details).__name__)
+                )
+            param_type = param_details.get("type")
+            param_description = param_details.get("description")
+            is_required = param_details.get("required")
+            if not isinstance(param_type, str) or not param_type:
+                raise ValueError(
+                    translate("工具 '%s' 的参数 '%s' 缺少 'type' 字段、为空或类型不是 str。")
+                    % (name, param_name)
+                )
+            if not isinstance(param_description, str) or not param_description:
+                 raise ValueError(
+                    translate("工具 '%s' 的参数 '%s' 缺少 'description' 字段、为空或类型不是 str。")
+                    % (name, param_name)
+                )
+            if not isinstance(is_required, bool):
+                raise TypeError(
+                    translate("工具 '%s' 的参数 '%s' 的 'required' 字段必须是 bool (True/False)，不能缺失或为其他类型。")
+                    % (name, param_name)
+                )  
+            properties[param_name] = {
+                "type": param_type,
+                "description": param_description
+            }
+            if is_required: required_list.append(param_name)
+        
+        if properties:
+            openai_parameters_schema = {
+                "type": "object",
+                "properties": properties,
+                "required": required_list
+            }
+            openai_function_def["parameters"] = openai_parameters_schema
+        openai_tools_schema.append({
+            "type": "function",
+            "function": openai_function_def
+        })
+    
+    return openai_tools_schema, tool_registry
 
 
 def _get_answer_raw(
@@ -101,7 +191,7 @@ def _get_answer_raw(
                 "prompt 应为 str 或 list，不应为 %s ！"
             ) % (type(prompt).__name__)
         )
-    
+
     if len(prompt_list) > 1:
         assert len(prompt_list) % 2 == 1, \
             translate(
@@ -170,49 +260,13 @@ def _get_answer_raw(
                 "role": "user", 
                 "content": content,
             })
-    
-    tool_registry: Dict[str, Callable] = {}
-    openai_tools_schema: List[Dict[str, Any]] = []
-    
-    if len(tools):
-        for tool_def in tools:
-            if "implementation" not in tool_def:
-                raise ValueError(
-                    translate(
-                        "工具定义缺少 'implementation' 键！"
-                    )
-                )
-            callable_func = tool_def["implementation"]
-            if not callable(callable_func):
-                raise ValueError(
-                    translate(
-                        "工具定义中的 'implementation' 字段必须是一个 Callable！"
-                    )
-                )
-            schema_part = tool_def.copy()
-            del schema_part["implementation"]
-            function_def = schema_part.get("function")
-            if not isinstance(function_def, dict):
-                raise ValueError(
-                    translate(
-                        "工具定义 %s 缺少 'function' 字典。"
-                    ) % str(schema_part)
-                )
-            tool_name = function_def.get("name")
-            if not isinstance(tool_name, str):
-                raise ValueError(
-                    translate(
-                        "工具定义 %s 缺少 'function.name' 字符串。"
-                    ) % str(schema_part)
-                )
-            tool_registry[tool_name] = callable_func
-            openai_tools_schema.append(schema_part)
-    
+
     optional_params = {}
     if temperature is not None: optional_params["temperature"] = temperature
     if top_p is not None: optional_params["top_p"] = top_p
     if max_completion_tokens is not None: optional_params["max_completion_tokens"] = max_completion_tokens
      
+    openai_tools_schema, tool_registry = _parse_tools(tools)
     api_tool_params: Dict[str, Any] = {}
     if openai_tools_schema:
         api_tool_params["tools"] = openai_tools_schema
