@@ -2,6 +2,9 @@ import os
 import re
 import ast
 import astor
+import asyncio
+import aiofiles
+import aiofiles.os as aiofiles_os
 import json
 import shutil
 import base64
@@ -11,6 +14,7 @@ from time import sleep
 from copy import deepcopy
 from threading import Lock
 from openai import OpenAI
+from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageFunctionToolCall
 from threading import Lock
 from random import normalvariate
@@ -32,7 +36,11 @@ __all__ = [
     "Lock",
     "sleep",
     "OpenAI",
+    "AsyncOpenAI",
     "minimize",
+    "asyncio",
+    "aiofiles",
+    "aiofiles_os",
     "normalvariate",
     "differential_evolution",
     "ChatCompletionMessageFunctionToolCall",
