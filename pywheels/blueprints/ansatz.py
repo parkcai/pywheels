@@ -1,7 +1,7 @@
 from __future__ import annotations
-from ..i18n import translate
+from ..i18n import *
 from ..typing import *
-from ..external import *
+from ..externals import *
 
 
 __all__ = [

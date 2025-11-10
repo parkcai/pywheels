@@ -47,7 +47,7 @@ pip install pywheels
 
 ```python
 # pywheels/miscellaneous/hello.py
-from ..i18n import translate
+from ..i18n import *
 
 def print_helloworld(
 )-> None:

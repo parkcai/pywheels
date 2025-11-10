@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from ..typing import *
-from ..i18n import translate
+from ..i18n import *
 
 
 __all__ = [

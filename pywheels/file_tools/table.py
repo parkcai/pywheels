@@ -2,7 +2,7 @@ import os
 import sys
 import openpyxl
 import pandas as pd
-from ..i18n import translate
+from ..i18n import *
 
 
 __all__ = [

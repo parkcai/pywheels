@@ -9,7 +9,7 @@ from typing import Literal
 from typing import Callable
 from typing import Optional
 from threading import Lock
-from ..i18n import translate
+from ..i18n import *
 
 
 __all__ = [

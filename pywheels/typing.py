@@ -8,6 +8,7 @@ from typing import TypeVar
 from typing import Literal
 from typing import Callable
 from typing import Optional
+from typing import Coroutine
 
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "Literal",
     "Callable",
     "Optional",
+    "Coroutine",
 ]

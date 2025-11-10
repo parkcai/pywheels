@@ -6,7 +6,7 @@ from typing import List
 from scipy.io import loadmat
 from scipy.io import savemat
 from scipy.io import whosmat
-from ..i18n import translate
+from ..i18n import *
 
 
 __all__ = [

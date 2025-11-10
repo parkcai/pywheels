@@ -1,4 +1,4 @@
-from ..i18n import translate
+from ..i18n import *
 
 
 __all__ = [
