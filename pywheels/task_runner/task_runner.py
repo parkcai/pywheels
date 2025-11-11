@@ -2,6 +2,7 @@ from ..i18n import *
 from ..typing import *
 from ..externals import *
 from ..file_tools import *
+from ..miscellaneous import *
 
 
 __all__ = [
@@ -21,17 +22,13 @@ def execute_command(
 ) -> dict:
     
     def transportable_command_parse(command: str)-> List[str]:
-        
-        if not command:
-            return []
-        
+        if not command: return []
         if sys.platform == 'win32':
             return command.split()
-        
         else:
             return shlex.split(command)
-
-    result_info = {
+    
+    result_info: Dict[str, Any] = {
         "success": False,
         "stdout": "",
         "stderr": "",
@@ -41,12 +38,11 @@ def execute_command(
     }
 
     try:
+        args: Union[List[str], str]
         if isinstance(command, (list, tuple)):
-            args: Union[List[str], str] = command
-            
+            args = list(command)
         else:
             args = command if shell else transportable_command_parse(command)
-
         process = subprocess.run(
             args,
             capture_output = True,
@@ -78,17 +74,13 @@ async def execute_command_async(
 ) -> dict:
     
     def transportable_command_parse(command: str)-> List[str]:
-        
-        if not command:
-            return [] # [FIX 1]
-        
+        if not command: return []
         if sys.platform == 'win32':
             return command.split()
-        
         else:
             return shlex.split(command)
 
-    result_info = {
+    result_info: Dict[str, Any] = {
         "success": False,
         "stdout": "",
         "stderr": "",
@@ -106,8 +98,9 @@ async def execute_command_async(
                 stderr=asyncio.subprocess.PIPE,
             )
         else:
+            args_tuple: Tuple[str, ...]
             if isinstance(command, (list, tuple)):
-                args_tuple: Tuple[str, ...] = tuple(command)
+                args_tuple = tuple(command)
             else:
                 args_list: List[str] = transportable_command_parse(command)
                 args_tuple = tuple(args_list)
@@ -123,6 +116,7 @@ async def execute_command_async(
             timeout=timeout_seconds
         )
         
+        assert process is not None
         result_info["stdout"] = stdout_bytes.decode()
         result_info["stderr"] = stderr_bytes.decode()
         result_info["exit_code"] = process.returncode
@@ -207,10 +201,10 @@ async def execute_python_script_async(
         shell = False,
     )
 
-    await asyncio.to_thread(
-        delete_file,
-        file_path = temp_file_path
-    )
+    try:
+        await aiofiles_os.remove(temp_file_path)
+    except FileNotFoundError:
+        pass
     
     return result_info
 
@@ -249,16 +243,26 @@ def run_tasks_concurrently(
         guarantee_file_exist(file_path=local_storage_path)
         try:
             with open(file=local_storage_path, mode="rb") as file_pointer:
-                cached_results = pickle.load(file_pointer)
-            results.update(cached_results)
-        except (FileNotFoundError, EOFError):
+                cached_bytes = file_pointer.read()
+                if cached_bytes:
+                    cached_results = pickle.loads(cached_bytes)
+                    results.update(cached_results)
+        except (FileNotFoundError, EOFError, pickle.UnpicklingError):
             pass
         
     def _save_cache():
         if not local_storage_path: return
-        with open(file=local_storage_path, mode="wb") as file_pointer:
-            pickle.dump(results, file_pointer)
-
+        halfway_local_storage_path = local_storage_path + f".halfway_{get_time_stamp(show_minute=True, show_second=True)}"
+        try:
+            with open(file=halfway_local_storage_path, mode="wb") as file_pointer:
+                pickle.dump(results, file_pointer)
+            os.replace(halfway_local_storage_path, local_storage_path)
+        finally:
+            try:
+                os.remove(halfway_local_storage_path)
+            except:
+                pass
+    
     with executor_class(
         max_workers = max_workers
     ) as executor:
@@ -312,7 +316,7 @@ async def run_tasks_concurrently_async(
     progress_bar_description: Optional[str] = None,
     local_storage_path: str = "",
     checkpoint_threshold: int = 10,
-)-> Dict[_TaskIndexerType, _TaskOutputType]:
+) -> Dict[_TaskIndexerType, _TaskOutputType]:
 
     if len(task_indexers) != len(task_inputs):
         raise ValueError(
@@ -325,21 +329,31 @@ async def run_tasks_concurrently_async(
     
     results: Dict[_TaskIndexerType, _TaskOutputType] = {}
     if local_storage_path:
-        await asyncio.to_thread(guarantee_file_exist, file_path=local_storage_path)
+        directory = os.path.dirname(local_storage_path)
+        if directory: await aiofiles_os.makedirs(directory, exist_ok=True)
         try:
             async with aiofiles.open(file=local_storage_path, mode="rb") as file_pointer:
                 cached_bytes = await file_pointer.read()
-                cached_results = pickle.loads(cached_bytes)
-            results.update(cached_results)
-        except (FileNotFoundError, EOFError):
+                if cached_bytes:
+                    cached_results = pickle.loads(cached_bytes)
+                    results.update(cached_results)
+        except (FileNotFoundError, EOFError, pickle.UnpicklingError):
             pass
         
     async def _save_cache_async():
         if not local_storage_path: return
-        async with aiofiles.open(file=local_storage_path, mode="wb") as file_pointer:
-            await file_pointer.write(pickle.dumps(results))
-
-    task_to_indexer: Dict[asyncio.Future, _TaskIndexerType] = {}
+        halfway_local_storage_path = local_storage_path + f".halfway_{get_time_stamp(show_minute=True, show_second=True)}"
+        try:
+            async with aiofiles.open(file=halfway_local_storage_path, mode="wb") as file_pointer:
+                await file_pointer.write(pickle.dumps(results))
+            await aiofiles_os.replace(halfway_local_storage_path, local_storage_path)
+        finally:
+            try:
+                await aiofiles_os.remove(halfway_local_storage_path)
+            except:
+                pass
+    
+    task_to_indexer: Dict[asyncio.Task, _TaskIndexerType] = {}
     tasks_to_run: Set[asyncio.Task] = set()
     
     for indexer, input_data in zip(task_indexers, task_inputs):
@@ -349,38 +363,43 @@ async def run_tasks_concurrently_async(
         task_to_indexer[task_obj] = indexer
         tasks_to_run.add(task_obj)
         
-    if not tasks_to_run:
-        return results
-    
-    task_iterator = asyncio.as_completed(tasks_to_run)
-    
+    if not tasks_to_run: return results
+
+    pbar: Optional[tqdm] = None
     if show_progress_bar:
-        task_iterator = tqdm(
-            iterable = task_iterator,
+        pbar = tqdm(
             total = len(task_indexers),
             desc = progress_bar_description
         )
-        task_iterator.update(len(task_indexers) - len(tasks_to_run))
+        pbar.update(len(task_indexers) - len(tasks_to_run))
 
+    pending: Set[asyncio.Task] = tasks_to_run
     tick = 0
-    for future in task_iterator:
-        indexer = task_to_indexer[future]
-        try:
-            results[indexer] = await future
-            tick += 1
-            if tick % checkpoint_threshold == 0:
-                await _save_cache_async()
-        except Exception as error:
-            if show_progress_bar and isinstance(task_iterator, tqdm):
-                task_iterator.close()
-            raise RuntimeError(
-                translate(
-                    "Task failed for indexer '%s': %s"
-                ) % (str(indexer), str(error))
-            ) from error
     
-    if show_progress_bar and isinstance(task_iterator, tqdm):
-        task_iterator.close()
-        
+    while pending:
+        done: Set[asyncio.Task]
+        done, pending = await asyncio.wait(
+            pending, 
+            return_when = asyncio.FIRST_COMPLETED
+        )
+        for completed_task in done:
+            indexer = task_to_indexer[completed_task]
+            try:
+                results[indexer] = await completed_task 
+                tick += 1
+                if tick % checkpoint_threshold == 0:
+                    await _save_cache_async()
+            except Exception as error:
+                if pbar: pbar.close()
+                raise RuntimeError(
+                    translate(
+                        "Task failed for indexer '%s': %s"
+                    ) % (str(indexer), str(error))
+                ) from error
+            
+            if pbar: pbar.update(1)
+
+    if pbar: pbar.close()
+    
     await _save_cache_async()
     return results
