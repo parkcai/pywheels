@@ -4,7 +4,7 @@ from setuptools import find_packages
 
 setup(
     name = "pywheels",
-    version = "0.8.2",
+    version = "0.8.3",
     packages = find_packages(),
     description = "Light-weight Python wheels",
     author = "parkcai",
@@ -22,5 +22,6 @@ setup(
         "openpyxl>=3.0.10",
         "pandas>=1.5.0",
         "astor>=0.8.0",
+        "aiofiles>=23.1.0",
     ],
 )
