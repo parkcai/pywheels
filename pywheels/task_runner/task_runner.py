@@ -222,6 +222,7 @@ def run_tasks_concurrently(
     progress_bar_description: Optional[str] = None,
     local_storage_path: str = "",
     checkpoint_threshold: int = 10,
+    lazy: bool = False,
 )-> Dict[_TaskIndexerType, _TaskOutputType]:
 
     if len(task_indexers) != len(task_inputs):
@@ -240,21 +241,23 @@ def run_tasks_concurrently(
     
     results: Dict[_TaskIndexerType, _TaskOutputType] = {}
     if local_storage_path:
-        guarantee_file_exist(file_path=local_storage_path)
+        guarantee_file_exist(file_path = local_storage_path)
         try:
-            with open(file=local_storage_path, mode="rb") as file_pointer:
+            with open(file = local_storage_path, mode = "rb") as file_pointer:
                 cached_bytes = file_pointer.read()
                 if cached_bytes:
                     cached_results = pickle.loads(cached_bytes)
                     results.update(cached_results)
         except (FileNotFoundError, EOFError, pickle.UnpicklingError):
             pass
+    
+    if lazy: return results
         
     def _save_cache():
         if not local_storage_path: return
-        halfway_local_storage_path = local_storage_path + f".halfway_{get_time_stamp(show_minute=True, show_second=True)}"
+        halfway_local_storage_path = local_storage_path + f".halfway_{get_time_stamp(show_minute = True, show_second = True)}"
         try:
-            with open(file=halfway_local_storage_path, mode="wb") as file_pointer:
+            with open(file = halfway_local_storage_path, mode = "wb") as file_pointer:
                 pickle.dump(results, file_pointer)
             os.replace(halfway_local_storage_path, local_storage_path)
         finally:
@@ -312,11 +315,13 @@ async def run_tasks_concurrently_async(
     task: Callable[..., Coroutine[Any, Any, _TaskOutputType]],
     task_indexers: List[_TaskIndexerType],
     task_inputs: List[Tuple[Any, ...]],
+    max_workers: Optional[int] = None,
     show_progress_bar: bool = True,
     progress_bar_description: Optional[str] = None,
     local_storage_path: str = "",
     checkpoint_threshold: int = 10,
-) -> Dict[_TaskIndexerType, _TaskOutputType]:
+    lazy: bool = False,
+)-> Dict[_TaskIndexerType, _TaskOutputType]:
 
     if len(task_indexers) != len(task_inputs):
         raise ValueError(
@@ -330,21 +335,23 @@ async def run_tasks_concurrently_async(
     results: Dict[_TaskIndexerType, _TaskOutputType] = {}
     if local_storage_path:
         directory = os.path.dirname(local_storage_path)
-        if directory: await aiofiles_os.makedirs(directory, exist_ok=True)
+        if directory: await aiofiles_os.makedirs(directory, exist_ok = True)
         try:
-            async with aiofiles.open(file=local_storage_path, mode="rb") as file_pointer:
+            async with aiofiles.open(file = local_storage_path, mode = "rb") as file_pointer:
                 cached_bytes = await file_pointer.read()
                 if cached_bytes:
                     cached_results = pickle.loads(cached_bytes)
                     results.update(cached_results)
         except (FileNotFoundError, EOFError, pickle.UnpicklingError):
             pass
-        
+    
+    if lazy: return results
+    
     async def _save_cache_async():
         if not local_storage_path: return
-        halfway_local_storage_path = local_storage_path + f".halfway_{get_time_stamp(show_minute=True, show_second=True)}"
+        halfway_local_storage_path = local_storage_path + f".halfway_{get_time_stamp(show_minute = True, show_second = True)}"
         try:
-            async with aiofiles.open(file=halfway_local_storage_path, mode="wb") as file_pointer:
+            async with aiofiles.open(file = halfway_local_storage_path, mode = "wb") as file_pointer:
                 await file_pointer.write(pickle.dumps(results))
             await aiofiles_os.replace(halfway_local_storage_path, local_storage_path)
         finally:
@@ -353,13 +360,24 @@ async def run_tasks_concurrently_async(
             except:
                 pass
     
+    semaphore: Optional[asyncio.Semaphore] = None
+    if max_workers is not None:
+        semaphore = asyncio.Semaphore(max_workers)
+
+    async def _bounded_task(args: Tuple[Any, ...])-> _TaskOutputType:
+        if semaphore:
+            async with semaphore:
+                return await task(*args)
+        else:
+            return await task(*args)
+
     task_to_indexer: Dict[asyncio.Task, _TaskIndexerType] = {}
     tasks_to_run: Set[asyncio.Task] = set()
     
     for indexer, input_data in zip(task_indexers, task_inputs):
         if indexer in results: continue
-        coro = task(*input_data)
-        task_obj = asyncio.create_task(coro)
+        coroutine = _bounded_task(input_data)
+        task_obj = asyncio.create_task(coroutine)
         task_to_indexer[task_obj] = indexer
         tasks_to_run.add(task_obj)
         
